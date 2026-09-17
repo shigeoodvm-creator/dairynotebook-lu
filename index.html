@@ -4530,6 +4530,15 @@ const renderAnimalRegModal=(animalId=null)=>{
   if(animalId) ensureAnimalSwabIds(fid,animalId);
   const animal=animalId?DB.getAnimals(fid).find(a=>a.id===animalId):null;
   const isEdit=!!animal;
+  const breedChoices=['ホルスタイン','黒毛和種','交雑種（F1）','ジャージー'];
+  const currentBreed=(animal?.breed||'').trim();
+  const breedOptions=[
+    '<option value="">── 未設定 ──</option>',
+    ...(currentBreed&&!breedChoices.includes(currentBreed)
+      ?[`<option value="${h(currentBreed)}" selected>${h(currentBreed)}（現在値）</option>`]
+      :[]),
+    ...breedChoices.map(b=>`<option value="${h(b)}" ${currentBreed===b?'selected':''}>${h(b)}</option>`)
+  ].join('');
   const farm=DB.getFarm(fid);
   const isCustomId=farm?.idMode==='custom';
   const isRealTagId = /^\d{10}$/.test(animal?.tagId||'');
@@ -4611,12 +4620,7 @@ const renderAnimalRegModal=(animalId=null)=>{
           </div>
           <div class="form-group">
             <label class="form-label">品種</label>
-            <input class="form-input" id="af-breed" value="${h(animal?.breed||'')}"
-              placeholder="例：ホルスタイン" list="af-breed-dl">
-            <datalist id="af-breed-dl">
-              <option value="ホルスタイン"><option value="黒毛和種">
-              <option value="交雑種（F1）"><option value="ジャージー">
-            </datalist>
+            <select class="form-select" id="af-breed">${breedOptions}</select>
           </div>
           <div class="form-group">
             <label class="form-label">性別</label>
