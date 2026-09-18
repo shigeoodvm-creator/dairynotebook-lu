@@ -6643,24 +6643,29 @@ const App={
     // CSV ヘッダー（複数農場の場合、最初の農場のIDラベルを使用）
     const _csvHdrFid=targets[0]?.id||'';
     const _idColLbl=DB.getFarm(_csvHdrFid)?.idMode==='custom'?'管理ID':'拡大4桁';
+    const LOBES=[['right','rf_a','右_前葉前部'],['right','rf_p','右_前葉後部'],['right','r_m','右_中葉'],['right','r_c','右_後葉'],
+                 ['left','lf_a','左_前葉前部'],['left','lf_p','左_前葉後部'],['left','l_c','左_後葉']];
     const HDR=[
       '農場名','耳標番号（10桁）',_idColLbl,'品種','性別','生年月日',
-      '検査日','検査時日齢(日)','ハッチ','群',
-      '右_前葉前部','右_前葉後部','右_中葉','右_後葉',
-      '左_前葉前部','左_前葉後部','左_後葉',
-      'OBスコア','主な所見','治療介入','薬剤','備考','ラウンド','記録作成日時',
-      '売却日','売却体重(kg)','売却価格(円)','売却種別'
+      '記録種別','検査日','検査時日齢(日)','ラウンド','胸囲(cm)','ハッチ','移動先ハッチ','群',
+      ...LOBES.map(l=>l[2]),
+      ...LOBES.map(l=>'コード_'+l[2]),
+      'OBスコア','主な所見','治療区分','初診日','薬剤','備考','記録作成日時',
+      '転帰','売却日','売却体重(kg)','売却価格(円)','売却種別','売却備考','死亡日','死亡備考'
     ];
 
     // 所見コードを日本語ラベルに変換（研究データ用）
-    const fLbl={'':'','A':'正常','L':'線状Bライン','B':'帯状Bライン(コメット)','C':'局所コンソリデーション','D':'びまん性コンソリデーション','H':'肝変化','E':'胸水','P':'膿瘍'};
+    const fLbl={'':'','A':'正常','L':'線状Bライン','B':'帯状Bライン(コメット)','S':'小コンソリデーション(<1cm²)','C':'局所コンソリデーション','D':'びまん性コンソリデーション','H':'肝変化','E':'胸水','P':'膿瘍'};
     const sexLbl={'F':'雌','M':'雄','':'不明'};
+    // 検査以外の記録（退出・在舎登録・群入退）を区別する
+    const recType=s=>s.autoDeathExit?'死亡退出':s.vacated?(s.relocatedToHutchId?'ハッチ移動(退出)':'ハッチ退出'):s.penEntered?'群入り':s.penVacated?'群退出':s.presentOnly?'在舎登録':'検査';
+    const treatLbl=s=>s.treatType==='ongoing'?'継続(治療中)':(s.treatType==='new'||s.treated)?'新規':'なし';
 
     // CSV 値のエスケープ（カンマ・改行・ダブルクォート対応）
     const esc=v=>{
       if(v==null)return '';
       const s=String(v);
-      if(s.includes(',')||s.includes('"')||s.includes('\n'))return '"'+s.replace(/"/g,'""')+'"';
+      if(/[,"\r\n]/.test(s))return '"'+s.replace(/"/g,'""')+'"';
       return s;
     };
 
@@ -6671,12 +6676,19 @@ const App={
       const animalsMap=new Map(_csvAnimals.map(a=>[a.id,a]));
       const _csvDispId=makeDispId(farm.id,_csvAnimals);
       const hutches=HutchUtil.get(farm.id);
-      const hutchLabel=s=>s.hutchId?(hutches.find(h=>h.id===s.hutchId)?.label||s.hutchId):s.hutchFree||'';
-      const penLabel=s=>s.penId?(PenUtil.get(farm.id).find(p=>p.id===s.penId)?.name||s.penId):'';
+      const pens=PenUtil.get(farm.id);
+      const hutchName=id=>id?(hutches.find(h=>h.id===id)?.label||id):'';
+      const penLabel=s=>s.penId?(pens.find(p=>p.id===s.penId)?.name||s.penId):'';
 
-      const scans=DB.getScans(farm.id).slice().sort((a,b)=>a.scanDate.localeCompare(b.scanDate));
+      const scans=DB.getScans(farm.id).slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+      // ラウンド：個体ごとの実スキャン順（examRoundForScan と同じ順序を一括計算）
+      const roundCnt=new Map();
       for(const s of scans){
         const an=animalsMap.get(s.animalId)||{};
+        const real=isRealScan(s);
+        let round='';
+        if(real){const n=(roundCnt.get(s.animalId)||0)+1;roundCnt.set(s.animalId,n);round=n;}
+        const lobeCodes=LOBES.map(([side,k])=>(s[side]?.[k])||'');
         const row=[
           farm.name,
           s.tagId||'',
@@ -6684,28 +6696,31 @@ const App={
           an.breed||'',
           sexLbl[an.sex||'']||'',
           an.birthDate||'',
+          recType(s),
           s.scanDate||'',
           s.ageAtScan!=null?s.ageAtScan:'',
-          hutchLabel(s),
+          round,
+          s.chestGirth!=null&&s.chestGirth!==''?s.chestGirth:'',
+          s.hutchId?hutchName(s.hutchId):(s.hutchFree||''),
+          hutchName(s.relocatedToHutchId),
           penLabel(s),
-          fLbl[s.right?.rf_a||''],
-          fLbl[s.right?.rf_p||''],
-          fLbl[s.right?.r_m ||''],
-          fLbl[s.right?.r_c ||''],
-          fLbl[s.left?.lf_a ||''],
-          fLbl[s.left?.lf_p ||''],
-          fLbl[s.left?.l_c  ||''],
-          s.obScore!=null?s.obScore:'',
-          s.mainFindings||'',
-          s.treatType==='ongoing'?'治療中':s.treated?'治療介入':'なし',
-          s.drug||'',
+          ...lobeCodes.map(c=>real?(fLbl[c]??c):''),
+          ...lobeCodes.map(c=>real?c:''),
+          real&&s.obScore!=null?s.obScore:'',
+          real?(s.mainFindings||''):'',
+          real?treatLbl(s):'',
+          real?(s.treatType==='ongoing'?(s.firstDiagDate||''):(s.treatType==='new'||s.treated)?s.scanDate:''):'',
+          real?(s.drug||''):'',
           s.notes||'',
-          isRealScan(s)?(examRoundForScan(fid,s.animalId,s)||s.round||1):(s.round||''),
           s.createdAt||'',
+          an.deathDate?'死亡':an.saleDate?'売却':'在籍',
           an.saleDate||'',
           an.saleWeightKg!=null?an.saleWeightKg:'',
           an.salePriceYen!=null?an.salePriceYen:'',
           an.saleType?({market:'市場出荷',direct:'直接販売',other:'その他'}[an.saleType]||an.saleType):'',
+          an.saleNotes||'',
+          an.deathDate||'',
+          an.deathNotes||'',
         ];
         rows.push(row.map(esc).join(','));
       }
