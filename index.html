@@ -1065,6 +1065,7 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
     <button class="tb-tab" data-route="/analysis"  onclick="App.nav('/analysis')">分析</button>
     <button class="tb-tab" data-route="/exam-memo" onclick="App.nav('/exam-memo')">📝 検診日誌</button>
     <button class="tb-tab" data-route="/guide"     onclick="App.nav('/guide')">ガイド・パンフ</button>
+    <button class="tb-tab" data-route="/settings"  onclick="App.nav('/settings')">⚙️ 設定</button>
   </div>
 
   <div class="tb-spacer"></div>
@@ -1092,7 +1093,6 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
         <button class="tb-menu-item" onclick="document.getElementById('file-in').click();App.closeMenus()">⬆ インポート（JSON）</button>
         <button class="tb-menu-item" onclick="App.openMilkCsvImport();App.closeMenus()">🥛 乳検CSVインポート</button>
         <div class="tb-menu-sep"></div>
-        <button class="tb-menu-item" onclick="App.nav('/karte-master');App.closeMenus()">🗂 カルテ用マスタ</button>
         <button class="tb-menu-item" onclick="App.nav('/karte');App.closeMenus()">🧾 カルテ転記</button>
         <div class="tb-menu-sep"></div>
         <div id="file-status" style="font-size:11px;padding:6px 16px;color:var(--text-3);line-height:1.5"></div>
@@ -1707,9 +1707,14 @@ const DB = {
 };
 
 // ─── Masters（カルテ用：薬品・種別コード） ─────────
+const mergeMasterDefaults=(saved,defs)=>{
+  const arr=(Array.isArray(saved)&&saved.length)?saved:[];
+  const byId=new Set(arr.map(x=>x&&x.id).filter(Boolean));
+  return arr.concat(defs.filter(x=>!byId.has(x.id)).map(x=>({...x})));
+};
 const Masters = {
-  drugs(){ const v = DB.g('karteDrugMaster'); return (Array.isArray(v)&&v.length)?v:KarteLogic.DEFAULT_DRUG_MASTER.slice(); },
-  procs(){ const v = DB.g('karteProcMaster'); return (Array.isArray(v)&&v.length)?v:KarteLogic.DEFAULT_PROC_MASTER.slice(); },
+  drugs(){ return mergeMasterDefaults(DB.g('karteDrugMaster'),KarteLogic.DEFAULT_DRUG_MASTER); },
+  procs(){ return mergeMasterDefaults(DB.g('karteProcMaster'),KarteLogic.DEFAULT_PROC_MASTER); },
   saveDrugs(a){ DB.s('karteDrugMaster', a); FileStore.schedule(); },
   saveProcs(a){ DB.s('karteProcMaster', a); FileStore.schedule(); },
 };
@@ -2273,12 +2278,22 @@ const renderDashboard=()=>{
 // NEW SCAN
 const _scanDrugRowHtml=(it,i)=>{
   const drugs=Masters.drugs();
+  const procs=Masters.procs();
+  const injProcs=procs.filter(p=>p.id==='p_im'||p.id==='p_sc'||String(p.name||'').includes('注射'));
+  const procOptions=injProcs.length?injProcs:procs;
+  const procId=it.procId||'p_im';
   return `<div class="form-row" style="align-items:flex-end;gap:8px;margin-bottom:8px">
     <div class="form-group" style="flex:2">
       <label class="form-label">薬品${i+1}</label>
       <select class="form-select" onchange="App.scanDrugChange(${i},'drugId',this.value)">
         <option value="">── 選択 ──</option>
         ${drugs.map(d=>`<option value="${h(d.id)}" ${it.drugId===d.id?'selected':''}>${h(d.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group" style="max-width:150px">
+      <label class="form-label">種別</label>
+      <select class="form-select" onchange="App.scanDrugChange(${i},'procId',this.value)">
+        ${procOptions.map(p=>`<option value="${h(p.id)}" ${procId===p.id?'selected':''}>${h(p.name)}</option>`).join('')}
       </select>
     </div>
     <div class="form-group" style="max-width:140px">
@@ -2500,13 +2515,6 @@ const renderNewScan=(editScan=null)=>{
           <input class="form-input" type="date" id="f-firstdiag" value="${h(s.firstDiagDate||'')}" max="${today()}">
         </div>
       </div>
-      <div class="form-row" id="drug-area" style="${s.treated?'':'display:none'}">
-        <div class="form-group">
-          <label class="form-label">使用薬剤・投与量</label>
-          <input class="form-input" id="f-drug" value="${h(s.drug||'')}" placeholder="例：エンロフロキサシン" list="drug-dl">
-          <datalist id="drug-dl">${DrugFreq.datalistHtml()}</datalist>
-        </div>
-      </div>
       <div class="form-row" style="margin-top:6px">
         <div class="form-group" style="max-width:160px">
           <label class="form-label">体温（℃）</label>
@@ -2519,11 +2527,13 @@ const renderNewScan=(editScan=null)=>{
           </label>
         </div>
       </div>
-      <div style="margin-top:6px">
+      <div id="drug-items-area" style="${s.treated?'':'display:none'};margin-top:6px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <label class="form-label" style="margin:0">使用薬剤（マスタ選択・複数可）</label>
           <button type="button" class="btn-sm btn-ghost" onclick="App.scanDrugAdd()">＋薬品を追加</button>
         </div>
+        <div class="form-hint" style="margin-bottom:8px">薬品名・種別コードは <a href="#" onclick="App.nav('/settings');return false">設定</a> で編集できます。</div>
+        ${s.drug&&!SS.drugItems.length?`<div class="form-hint" style="margin-bottom:8px;color:#b45309">旧自由記述の薬剤記録：${h(s.drug)}（必要なら下のマスタ選択で登録し直してください）</div>`:''}
         <div id="drug-items">${SS.drugItems.map((it,i)=>_scanDrugRowHtml(it,i)).join('')}</div>
       </div>
       <div class="form-group full" style="margin-top:6px">
@@ -5534,11 +5544,15 @@ const _kmTableHtml=(kind,title,icon,rows)=>`
       </table>
     </div>
   </div>`;
-const renderKarteMasterView=()=>{
+const renderSettingsView=()=>{
   setView(`
   <div class="page-hd">
-    <div class="page-title">カルテ用マスタ</div>
-    <div class="page-sub">カルテ転記で使用する薬品・種別コードを編集します（保存するまで反映されません）</div>
+    <div class="page-title">設定</div>
+    <div class="page-sub">薬品マスタ・種別コードなど、アプリの設定をここで管理します</div>
+  </div>
+  <div class="callout cl-blue" style="max-width:980px;margin:0 auto 14px">
+    <div class="callout-i">💡</div>
+    <div>カルテ転記で使う薬品名と Access 側コードを設定します。種別コードには、鼻腔スワブ検査（培養・PCR）と注射種別を登録しておきます。</div>
   </div>
   ${_kmTableHtml('drugs','薬品マスタ','💊',KMS.drugs)}
   ${_kmTableHtml('procs','種別コードマスタ','📋',KMS.procs)}
@@ -5547,10 +5561,11 @@ const renderKarteMasterView=()=>{
   </div>
   `);
 };
-const renderKarteMaster=()=>{
+const renderSettings=()=>{
   KMS={drugs:Masters.drugs().map(x=>({...x})),procs:Masters.procs().map(x=>({...x}))};
-  renderKarteMasterView();
+  renderSettingsView();
 };
+const renderKarteMaster=renderSettings;
 
 // ─── KARTE 転記ビュー（連番・スキップ・順送りコピー） ───────
 // KV: ビュー内一時状態。date=選択中の検査日／skip=除外scanIdのSet／seqIdx・seqQueue=順送りコピー用
@@ -6882,7 +6897,7 @@ const App={
   onBd(){const bd=$('f-bd')?.value;const sd=$('f-date')?.value||today();const ael=$('f-age');if(bd&&ael)ael.value=calcAge(bd,sd);},
   onTreat(v){
     // v: '' = なし, 'new' = 治療介入（スキャン日=初診日）, 'ongoing' = 治療中（初診日を手入力）
-    const da=$('drug-area');if(da)da.style.display=v?'grid':'none';
+    const da=$('drug-items-area');if(da)da.style.display=v?'block':'none';
     const fda=$('firstdiag-area');if(fda)fda.style.display=v==='ongoing'?'block':'none';
     SS.treatType=v||'';
     document.querySelectorAll('.treat-seg-btn').forEach(b=>{
@@ -6968,9 +6983,9 @@ const App={
     // 治療中の場合は手入力の初診日を使用、治療介入(new)の場合はスキャン日が初診日（firstDiagDate不要）
     const firstDiagDate=(!presentOnly&&treatType==='ongoing')?($('f-firstdiag')?.value||''):'';
     const _bodyTemp=(function(){ const v = parseFloat($('f-bodytemp')?.value); return isNaN(v)?null:v; })();
-    const _drugItems=(SS.drugItems||[]).filter(it=>it.drugId).map(it=>({drugId:it.drugId, qty:(it.qty||'').toString().trim()}));
+    const _drugItems=(!presentOnly&&treatType?(SS.drugItems||[]):[]).filter(it=>it.drugId).map(it=>({drugId:it.drugId, procId:it.procId||'p_im', qty:(it.qty||'').toString().trim()}));
     const _drugItemNames=_drugItems.map(it=>{const d=Masters.drugs().find(x=>x.id===it.drugId);return d?d.name:'';}).filter(Boolean).join('、');
-    const scan={farmId:fid,animalId:animal.id,tagId,scanDate,ageAtScan,round,chestGirth,...(presentOnly?{presentOnly:true,right:{},left:{},obScore:null,mainFindings:'',treated:false,treatType:'',drug:'',notes:$('f-notes').value.trim()}:{right:{...SS.right},left:{...SS.left},obScore:score,mainFindings:$('f-findings').value.trim(),treated:!!treatType,treatType,...(firstDiagDate?{firstDiagDate}:{}),drug:_drugItems.length?_drugItemNames:($('f-drug')?.value.trim()||''),bodyTemp:_bodyTemp,procedures:{swab:!!$('f-swab')?.checked},drugItems:_drugItems,notes:$('f-notes').value.trim()}),...(hutchId?{hutchId}:{}),...(hutchFree&&!hutchId?{hutchFree}:{})};
+    const scan={farmId:fid,animalId:animal.id,tagId,scanDate,ageAtScan,round,chestGirth,...(presentOnly?{presentOnly:true,right:{},left:{},obScore:null,mainFindings:'',treated:false,treatType:'',drug:'',notes:$('f-notes').value.trim()}:{right:{...SS.right},left:{...SS.left},obScore:score,mainFindings:$('f-findings').value.trim(),treated:!!treatType,treatType,...(firstDiagDate?{firstDiagDate}:{}),drug:_drugItemNames,bodyTemp:_bodyTemp,procedures:{swab:!!$('f-swab')?.checked},drugItems:_drugItems,notes:$('f-notes').value.trim()}),...(hutchId?{hutchId}:{}),...(hutchFree&&!hutchId?{hutchFree}:{})};
     if(SS.editId){scan.id=SS.editId;DB.updateScan(fid,scan);toast('記録を更新しました','ok');}
     else{DB.addScan(fid,scan);toast(presentOnly?`${tagId} の在舎記録を保存しました`:`${tagId} のスキャンを保存しました（スコア ${score}）`,'ok');}
     // ハッチが指定されている場合、同個体の同日以降のスキャンに反映
@@ -7574,6 +7589,7 @@ const App={
     Router.on('/exam-memo',()=>renderExamMemo());
     Router.on('/hatch-map',()=>renderHatchMap());
     Router.on('/pen-map',()=>renderPenMap());
+    Router.on('/settings',()=>renderSettings());
     Router.on('/karte-master',()=>renderKarteMaster());
     Router.on('/karte',()=>renderKarte());
     (async ()=>{

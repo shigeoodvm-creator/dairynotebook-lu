@@ -14,6 +14,7 @@
     { id: 'p_culture', name: '細菌培養',   code: '0164' },
     { id: 'p_pcr',     name: 'PCR検査',    code: '0197' },
     { id: 'p_im',      name: '筋肉注射',   code: '0370' },
+    { id: 'p_sc',      name: '皮下注射',   code: '' },
   ];
 
   // [side, key, 表示ラベル]（解剖学的順）
@@ -81,8 +82,9 @@
 
     ((scan && scan.drugItems) || []).forEach(item => {
       if (!item || !item.drugId) return;
+      const procId = item.procId || 'p_im';
       rows.push({ kind: 'drug', date, temp: '', findings: '',
-        procCode: _codeById(procMaster, 'p_im'),
+        procCode: _codeById(procMaster, procId),
         drugCode: _codeById(drugMaster, item.drugId),
         qty: (item.qty === 0 || item.qty) ? String(item.qty) : '' });
     });
