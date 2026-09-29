@@ -5580,6 +5580,21 @@ const KARTE_FIELDS=[
   {key:'qty',label:'⑥数量'},
 ];
 const _karteRowsFor=(scan)=>KarteLogic.buildKarteRows(scan,{procMaster:Masters.procs(),drugMaster:Masters.drugs()});
+const _karteCodeDisplay=(row,fd)=>{
+  const v=row[fd.key];
+  if(v===''||v==null)return v;
+  if(fd.key==='procCode'){
+    const proc=Masters.procs().find(p=>String(p.code)===String(v));
+    const name=proc?.name||KARTE_KIND_LABEL[row.kind]||'種別';
+    return `種別${name}：コード${v}`;
+  }
+  if(fd.key==='drugCode'){
+    const drug=Masters.drugs().find(d=>String(d.code)===String(v));
+    const name=drug?.name||'';
+    return name?`薬品${name}：コード${v}`:`薬品コード：${v}`;
+  }
+  return v;
+};
 // 選択日・スキップ状態から順送りキューを再構築（空欄項目は除外）
 const _karteBuildQueue=(numbered)=>{
   const q=[];
@@ -5596,11 +5611,11 @@ const _karteBuildQueue=(numbered)=>{
   });
   return q;
 };
-const _karteFieldHtml=(label,value)=>{
+const _karteFieldHtml=(label,value,displayValue=value)=>{
   const has=value!==''&&value!=null;
   return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border-2)">
     <span style="font-size:12px;color:var(--text-3);min-width:96px;flex-shrink:0">${label}</span>
-    <span style="flex:1;font-size:13px;color:${has?'var(--text-1)':'var(--text-4)'};word-break:break-all">${has?h(value):'－'}</span>
+    <span style="flex:1;font-size:13px;color:${has?'var(--text-1)':'var(--text-4)'};word-break:break-all">${has?h(displayValue):'－'}</span>
     ${has?`<button class="btn-sm btn-ghost" data-copy="${h(value)}" onclick="App.karteCopyClick(this)">📋</button>`:''}
   </div>`;
 };
@@ -5609,7 +5624,7 @@ const _karteRowHtml=(row,idx)=>{
   const sep=idx>0;
   return `<div style="${sep?'margin-top:12px;padding-top:12px;border-top:1px solid var(--border-2)':''}">
     <div style="font-size:12px;font-weight:800;color:var(--navy-2);margin-bottom:4px">${h(kindLabel)}</div>
-    ${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key])).join('')}
+    ${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd))).join('')}
   </div>`;
 };
 const _karteRoundInfo=(scan)=>{
@@ -5646,11 +5661,11 @@ const _karteCardHtml=(entry,dispId,idLabel)=>{
 };
 // ─── カルテ転記：担当分HTML書き出し（案B・自己完結） ───────
 // 生成HTMLはアプリ本体・localStorage・ネットワークに依存しない（値は生成時に文字列として焼き込む）
-const _karteExportFieldHtml=(label,value)=>{
+const _karteExportFieldHtml=(label,value,displayValue=value)=>{
   const has=value!==''&&value!=null;
   return `<div class="kx-field">
     <span class="kx-label">${label}</span>
-    <span class="kx-value${has?'':' kx-empty'}">${has?h(value):'－'}</span>
+    <span class="kx-value${has?'':' kx-empty'}">${has?h(displayValue):'－'}</span>
     ${has?`<button class="kx-copybtn" data-copy="${h(value)}" onclick="kxCopyClick(this)">📋</button>`:''}
   </div>`;
 };
@@ -5658,7 +5673,7 @@ const _karteExportRowHtml=(row,idx)=>{
   const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
   return `<div class="kx-row${idx>0?' kx-row-sep':''}">
     <div class="kx-kind">${h(kindLabel)}</div>
-    ${KARTE_FIELDS.map(fd=>_karteExportFieldHtml(fd.label,row[fd.key])).join('')}
+    ${KARTE_FIELDS.map(fd=>_karteExportFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd))).join('')}
   </div>`;
 };
 const _karteExportCardHtml=(entry,dispId,idLabel)=>{
