@@ -5612,11 +5612,19 @@ const _karteRowHtml=(row,idx)=>{
     ${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key])).join('')}
   </div>`;
 };
+const _karteRoundInfo=(scan)=>{
+  const fid=DB.activeId();
+  const r=fid&&scan&&isRealScan(scan)?(examRoundForScan(fid,scan.animalId,scan)||scan.round||1):(scan?.round||'');
+  const n=parseInt(r,10);
+  if(!Number.isFinite(n)||n<1)return {text:'肺エコー回数不明',note:'カルテ要確認',cls:'b-gray',first:false};
+  return {text:`肺エコー${n}回目`,note:n===1?'初診カルテ作成':'既存カルテ確認',cls:n===1?'b-red':'b-blue',first:n===1};
+};
 const _karteCardHtml=(entry,dispId,idLabel)=>{
   const {seq,scan}=entry;
   const skipped=KV.skip.has(scan.id);
   const rows=_karteRowsFor(scan);
   const tag=scan.tagId||'';
+  const roundInfo=_karteRoundInfo(scan);
   return `<div class="card"${skipped?' style="opacity:.55;filter:grayscale(.7)"':''}>
     <div class="card-hd" style="flex-wrap:wrap">
       <div class="card-hd-icon blue" style="width:auto;min-width:30px;padding:0 9px;border-radius:14px;font-weight:800">No.${seq}</div>
@@ -5624,6 +5632,7 @@ const _karteCardHtml=(entry,dispId,idLabel)=>{
         ${fmtTagId(tag)}
         <span style="margin-left:10px;font-size:12px;color:var(--text-3)">${h(idLabel)}：</span>
         <span class="tag-exp-lg" style="font-size:15px;padding:1px 8px">${h(dispId(tag))}</span>
+        <span class="badge ${roundInfo.cls}" style="margin-left:10px">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
       </div>
       <div class="card-hd-sub" style="display:flex;align-items:center;gap:8px">
         ${skipped?'<span class="badge b-amber">⏭️ 別形態で記録</span>':''}
@@ -5656,12 +5665,14 @@ const _karteExportCardHtml=(entry,dispId,idLabel)=>{
   const {seq,scan}=entry;
   const rows=_karteRowsFor(scan);
   const tag=scan.tagId||'';
+  const roundInfo=_karteRoundInfo(scan);
   return `<div class="kx-card">
     <div class="kx-hd">
       <span class="kx-no">No.${seq}</span>
       <span class="kx-tag">${fmtTagId(tag)}</span>
       <span class="kx-idlabel">${h(idLabel)}：</span>
       <span class="kx-idval">${h(dispId(tag))}</span>
+      <span class="kx-round ${roundInfo.first?'kx-round-first':'kx-round-follow'}">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
     </div>
     <div class="kx-body">
       ${rows.map((r,i)=>_karteExportRowHtml(r,i)).join('')}
@@ -5717,6 +5728,9 @@ const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
   .tag-cd{color:var(--text-4);font-size:12px}
   .kx-idlabel{font-size:12px;color:var(--text-3)}
   .kx-idval{font-weight:800;color:var(--navy-2);background:#eef2f7;border-radius:6px;padding:1px 8px;font-size:14px}
+  .kx-round{font-size:12px;font-weight:800;border-radius:12px;padding:2px 9px}
+  .kx-round-first{background:#fee2e2;color:#b91c1c}
+  .kx-round-follow{background:#dbeafe;color:#1d4ed8}
   .kx-row-sep{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-2)}
   .kx-kind{font-size:12px;font-weight:800;color:var(--navy-2);margin-bottom:4px}
   .kx-field{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border-2)}
