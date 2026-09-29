@@ -1092,6 +1092,9 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
         <button class="tb-menu-item" onclick="document.getElementById('file-in').click();App.closeMenus()">⬆ インポート（JSON）</button>
         <button class="tb-menu-item" onclick="App.openMilkCsvImport();App.closeMenus()">🥛 乳検CSVインポート</button>
         <div class="tb-menu-sep"></div>
+        <button class="tb-menu-item" onclick="App.nav('/karte-master');App.closeMenus()">🗂 カルテ用マスタ</button>
+        <button class="tb-menu-item" onclick="App.nav('/karte');App.closeMenus()">🧾 カルテ転記</button>
+        <div class="tb-menu-sep"></div>
         <div id="file-status" style="font-size:11px;padding:6px 16px;color:var(--text-3);line-height:1.5"></div>
       </div>
     </div>
@@ -1428,7 +1431,9 @@ const FileStore = {
     const farms = DB.getFarms();
     const data = {v:'fs1', date: new Date().toISOString(), farms,
       animals: Object.fromEntries(farms.map(f=>[f.id, DB.getAnimals(f.id)])),
-      scans:   Object.fromEntries(farms.map(f=>[f.id, DB.getScans(f.id)]))
+      scans:   Object.fromEntries(farms.map(f=>[f.id, DB.getScans(f.id)])),
+      karteDrugMaster: DB.g('karteDrugMaster')||null,
+      karteProcMaster: DB.g('karteProcMaster')||null
     };
     return JSON.stringify(data, null, 2);
   },
@@ -1500,6 +1505,7 @@ const FileStore = {
       if(d.v === 'fs1'){
         if(Array.isArray(d.farms)){
           DB._bulkLoad(d.farms, d.animals||{}, d.scans||{});
+          DB.loadKarteMasters(d);
           this._syncLocalTouchToFile(d);
           toast(`ファイルを開きました（${d.farms.length}農場）`,'ok');
         }
@@ -1572,6 +1578,7 @@ const FileStore = {
             return;
           }
           DB._bulkLoad(d.farms, d.animals||{}, d.scans||{});
+          DB.loadKarteMasters(d);
           this._syncLocalTouchToFile(d);
         }
         const ts = new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
@@ -1615,6 +1622,7 @@ const FileStore = {
             return;
           }
           DB._bulkLoad(d.farms, d.animals||{}, d.scans||{});
+          DB.loadKarteMasters(d);
           this._syncLocalTouchToFile(d);
         }
         const ts = new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
@@ -1680,6 +1688,11 @@ const DB = {
       this.setActive(farms[0].id);
     }
   },
+  // FileStore のJSONからカルテ用マスタ（薬品・種別コード）を復元
+  loadKarteMasters(d){
+    if(d && Array.isArray(d.karteDrugMaster)) this.s('karteDrugMaster', d.karteDrugMaster);
+    if(d && Array.isArray(d.karteProcMaster)) this.s('karteProcMaster', d.karteProcMaster);
+  },
   // 起動時に前回キャッシュを消去し、必ずファイル指定から開始する
   clearStartupCache(){
     try{
@@ -1691,6 +1704,14 @@ const DB = {
       keysToDelete.forEach(k=>localStorage.removeItem(k));
     }catch{}
   }
+};
+
+// ─── Masters（カルテ用：薬品・種別コード） ─────────
+const Masters = {
+  drugs(){ const v = DB.g('karteDrugMaster'); return (Array.isArray(v)&&v.length)?v:KarteLogic.DEFAULT_DRUG_MASTER.slice(); },
+  procs(){ const v = DB.g('karteProcMaster'); return (Array.isArray(v)&&v.length)?v:KarteLogic.DEFAULT_PROC_MASTER.slice(); },
+  saveDrugs(a){ DB.s('karteDrugMaster', a); FileStore.schedule(); },
+  saveProcs(a){ DB.s('karteProcMaster', a); FileStore.schedule(); },
 };
 
 // ─── Drug Frequency ───────────────────────────────
@@ -2136,9 +2157,9 @@ const setView=html=>{
 };
 
 // ─── Scan State ───────────────────────────────────
-let SS={right:{rf_a:'',rf_p:'',r_m:'',r_c:''},left:{lf_a:'',lf_p:'',l_c:''},score:0,editId:null,exp4:'',treatType:'',firstDiagDate:''};
-const resetSS=()=>{SS={right:{rf_a:'',rf_p:'',r_m:'',r_c:''},left:{lf_a:'',lf_p:'',l_c:''},score:0,editId:null,exp4:'',treatType:'',firstDiagDate:''};};
-const loadSS=s=>{SS.right={rf_a:'',rf_p:'',r_m:'',r_c:'',...(s.right||{})};SS.left={lf_a:'',lf_p:'',l_c:'',...(s.left||{})};SS.score=s.obScore||0;SS.editId=s.id;SS.treatType=s.treatType||(s.treated?'new':'');SS.firstDiagDate=s.firstDiagDate||'';};
+let SS={right:{rf_a:'',rf_p:'',r_m:'',r_c:''},left:{lf_a:'',lf_p:'',l_c:''},score:0,editId:null,exp4:'',treatType:'',firstDiagDate:'',drugItems:[]};
+const resetSS=()=>{SS={right:{rf_a:'',rf_p:'',r_m:'',r_c:''},left:{lf_a:'',lf_p:'',l_c:''},score:0,editId:null,exp4:'',treatType:'',firstDiagDate:'',drugItems:[]};};
+const loadSS=s=>{SS.right={rf_a:'',rf_p:'',r_m:'',r_c:'',...(s.right||{})};SS.left={lf_a:'',lf_p:'',l_c:'',...(s.left||{})};SS.score=s.obScore||0;SS.editId=s.id;SS.treatType=s.treatType||(s.treated?'new':'');SS.firstDiagDate=s.firstDiagDate||'';SS.drugItems=Array.isArray(s.drugItems)?s.drugItems.map(x=>({...x})):[];};
 
 // ─── Mini lung grid (read-only) ───────────────────
 const miniLung=sides=>{
@@ -2250,6 +2271,23 @@ const renderDashboard=()=>{
 };
 
 // NEW SCAN
+const _scanDrugRowHtml=(it,i)=>{
+  const drugs=Masters.drugs();
+  return `<div class="form-row" style="align-items:flex-end;gap:8px;margin-bottom:8px">
+    <div class="form-group" style="flex:2">
+      <label class="form-label">薬品${i+1}</label>
+      <select class="form-select" onchange="App.scanDrugChange(${i},'drugId',this.value)">
+        <option value="">── 選択 ──</option>
+        ${drugs.map(d=>`<option value="${h(d.id)}" ${it.drugId===d.id?'selected':''}>${h(d.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group" style="max-width:140px">
+      <label class="form-label">使用量</label>
+      <input class="form-input" value="${h(it.qty||'')}" placeholder="例：15ml" oninput="App.scanDrugChange(${i},'qty',this.value)">
+    </div>
+    <button type="button" class="btn-sm btn-danger" onclick="App.scanDrugDel(${i})">削除</button>
+  </div>`;
+};
 const renderNewScan=(editScan=null)=>{
   const fid=DB.activeId();const farm=DB.getFarm(fid);
   if(!fid||!farm){renderHome();return;}
@@ -2468,6 +2506,25 @@ const renderNewScan=(editScan=null)=>{
           <input class="form-input" id="f-drug" value="${h(s.drug||'')}" placeholder="例：エンロフロキサシン" list="drug-dl">
           <datalist id="drug-dl">${DrugFreq.datalistHtml()}</datalist>
         </div>
+      </div>
+      <div class="form-row" style="margin-top:6px">
+        <div class="form-group" style="max-width:160px">
+          <label class="form-label">体温（℃）</label>
+          <input class="form-input" id="f-bodytemp" type="number" step="0.1" inputmode="decimal" value="${h(s.bodyTemp??'')}" placeholder="例：39.8">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-2)">
+            <input type="checkbox" id="f-swab" ${s.procedures&&s.procedures.swab?'checked':''} style="width:16px;height:16px;cursor:pointer">
+            鼻腔スワブ（培養0164＋PCR0197）
+          </label>
+        </div>
+      </div>
+      <div style="margin-top:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="form-label" style="margin:0">使用薬剤（マスタ選択・複数可）</label>
+          <button type="button" class="btn-sm btn-ghost" onclick="App.scanDrugAdd()">＋薬品を追加</button>
+        </div>
+        <div id="drug-items">${SS.drugItems.map((it,i)=>_scanDrugRowHtml(it,i)).join('')}</div>
       </div>
       <div class="form-group full" style="margin-top:6px">
         <label class="form-label">備考・次回予定</label>
@@ -5456,11 +5513,415 @@ function onCommentSizeChange(){
   document.querySelectorAll('.rpt-wrap .comment-text').forEach(function(t){t.style.fontSize=commentFontSize;});
 }
 
+// ─── KARTE MASTER（薬品・種別コード） ───────────────
+let KMS=null; // {drugs:[{id,name,code}], procs:[{id,name,code}]}（編集中の作業用コピー）
+const _kmRowHtml=(kind,r)=>`<tr id="km-${kind}-${r.id}">
+    <td><input class="form-input" value="${h(r.name)}" placeholder="名称" onchange="App.kmChange('${kind}','${r.id}','name',this.value)"></td>
+    <td><input class="form-input" value="${h(r.code)}" placeholder="コード" style="max-width:140px" onchange="App.kmChange('${kind}','${r.id}','code',this.value)"></td>
+    <td style="white-space:nowrap"><button class="btn-sm btn-danger" onclick="App.kmDel('${kind}','${r.id}')">削除</button></td>
+  </tr>`;
+const _kmTableHtml=(kind,title,icon,rows)=>`
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-icon blue">${icon}</div>
+      <div class="card-hd-title">${title}</div>
+      <div class="card-hd-sub"><button class="btn-sm btn-ghost" onclick="App.kmAdd('${kind}')">＋ 追加</button></div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="km-${kind}-tbl">
+        <thead><tr><th>名称</th><th>コード</th><th></th></tr></thead>
+        <tbody id="km-${kind}-tbody">${rows.map(r=>_kmRowHtml(kind,r)).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+const renderKarteMasterView=()=>{
+  setView(`
+  <div class="page-hd">
+    <div class="page-title">カルテ用マスタ</div>
+    <div class="page-sub">カルテ転記で使用する薬品・種別コードを編集します（保存するまで反映されません）</div>
+  </div>
+  ${_kmTableHtml('drugs','薬品マスタ','💊',KMS.drugs)}
+  ${_kmTableHtml('procs','種別コードマスタ','📋',KMS.procs)}
+  <div style="text-align:right;margin-top:4px">
+    <button class="btn-primary" onclick="App.kmSave()">💾 保存</button>
+  </div>
+  `);
+};
+const renderKarteMaster=()=>{
+  KMS={drugs:Masters.drugs().map(x=>({...x})),procs:Masters.procs().map(x=>({...x}))};
+  renderKarteMasterView();
+};
+
+// ─── KARTE 転記ビュー（連番・スキップ・順送りコピー） ───────
+// KV: ビュー内一時状態。date=選択中の検査日／skip=除外scanIdのSet／seqIdx・seqQueue=順送りコピー用
+let KV={date:null,skip:new Set(),seqIdx:0,seqQueue:[]};
+const KARTE_KIND_LABEL={echo:'超音波検査',culture:'細菌培養',pcr:'PCR検査',drug:'投薬'};
+const KARTE_FIELDS=[
+  {key:'date',label:'①日付'},
+  {key:'temp',label:'②体温'},
+  {key:'findings',label:'③所見'},
+  {key:'procCode',label:'④種別コード'},
+  {key:'drugCode',label:'⑤薬品コード'},
+  {key:'qty',label:'⑥数量'},
+];
+const _karteRowsFor=(scan)=>KarteLogic.buildKarteRows(scan,{procMaster:Masters.procs(),drugMaster:Masters.drugs()});
+// 選択日・スキップ状態から順送りキューを再構築（空欄項目は除外）
+const _karteBuildQueue=(numbered)=>{
+  const q=[];
+  numbered.forEach(({seq,scan})=>{
+    if(KV.skip.has(scan.id))return;
+    _karteRowsFor(scan).forEach(row=>{
+      const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
+      KARTE_FIELDS.forEach(fd=>{
+        const v=row[fd.key];
+        if(v===''||v==null)return;
+        q.push({seq,kindLabel,fieldLabel:fd.label,value:String(v)});
+      });
+    });
+  });
+  return q;
+};
+const _karteFieldHtml=(label,value)=>{
+  const has=value!==''&&value!=null;
+  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border-2)">
+    <span style="font-size:12px;color:var(--text-3);min-width:96px;flex-shrink:0">${label}</span>
+    <span style="flex:1;font-size:13px;color:${has?'var(--text-1)':'var(--text-4)'};word-break:break-all">${has?h(value):'－'}</span>
+    ${has?`<button class="btn-sm btn-ghost" data-copy="${h(value)}" onclick="App.karteCopyClick(this)">📋</button>`:''}
+  </div>`;
+};
+const _karteRowHtml=(row,idx)=>{
+  const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
+  const sep=idx>0;
+  return `<div style="${sep?'margin-top:12px;padding-top:12px;border-top:1px solid var(--border-2)':''}">
+    <div style="font-size:12px;font-weight:800;color:var(--navy-2);margin-bottom:4px">${h(kindLabel)}</div>
+    ${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key])).join('')}
+  </div>`;
+};
+const _karteCardHtml=(entry,dispId,idLabel)=>{
+  const {seq,scan}=entry;
+  const skipped=KV.skip.has(scan.id);
+  const rows=_karteRowsFor(scan);
+  const tag=scan.tagId||'';
+  return `<div class="card"${skipped?' style="opacity:.55;filter:grayscale(.7)"':''}>
+    <div class="card-hd" style="flex-wrap:wrap">
+      <div class="card-hd-icon blue" style="width:auto;min-width:30px;padding:0 9px;border-radius:14px;font-weight:800">No.${seq}</div>
+      <div class="card-hd-title">
+        ${fmtTagId(tag)}
+        <span style="margin-left:10px;font-size:12px;color:var(--text-3)">${h(idLabel)}：</span>
+        <span class="tag-exp-lg" style="font-size:15px;padding:1px 8px">${h(dispId(tag))}</span>
+      </div>
+      <div class="card-hd-sub" style="display:flex;align-items:center;gap:8px">
+        ${skipped?'<span class="badge b-amber">⏭️ 別形態で記録</span>':''}
+        <button class="btn-sm ${skipped?'btn-primary':'btn-outline'}" onclick="App.karteToggleSkip('${scan.id}')">${skipped?'スキップ解除':'スキップ'}</button>
+      </div>
+    </div>
+    <div class="card-body">
+      ${rows.map((r,i)=>_karteRowHtml(r,i)).join('')}
+    </div>
+  </div>`;
+};
+// ─── カルテ転記：担当分HTML書き出し（案B・自己完結） ───────
+// 生成HTMLはアプリ本体・localStorage・ネットワークに依存しない（値は生成時に文字列として焼き込む）
+const _karteExportFieldHtml=(label,value)=>{
+  const has=value!==''&&value!=null;
+  return `<div class="kx-field">
+    <span class="kx-label">${label}</span>
+    <span class="kx-value${has?'':' kx-empty'}">${has?h(value):'－'}</span>
+    ${has?`<button class="kx-copybtn" data-copy="${h(value)}" onclick="kxCopyClick(this)">📋</button>`:''}
+  </div>`;
+};
+const _karteExportRowHtml=(row,idx)=>{
+  const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
+  return `<div class="kx-row${idx>0?' kx-row-sep':''}">
+    <div class="kx-kind">${h(kindLabel)}</div>
+    ${KARTE_FIELDS.map(fd=>_karteExportFieldHtml(fd.label,row[fd.key])).join('')}
+  </div>`;
+};
+const _karteExportCardHtml=(entry,dispId,idLabel)=>{
+  const {seq,scan}=entry;
+  const rows=_karteRowsFor(scan);
+  const tag=scan.tagId||'';
+  return `<div class="kx-card">
+    <div class="kx-hd">
+      <span class="kx-no">No.${seq}</span>
+      <span class="kx-tag">${fmtTagId(tag)}</span>
+      <span class="kx-idlabel">${h(idLabel)}：</span>
+      <span class="kx-idval">${h(dispId(tag))}</span>
+    </div>
+    <div class="kx-body">
+      ${rows.map((r,i)=>_karteExportRowHtml(r,i)).join('')}
+    </div>
+  </div>`;
+};
+// 選択範囲から順送りコピー用キューを構築（空欄項目は除外。スキップ概念なし＝範囲内すべて対象）
+const _karteExportQueue=(selected)=>{
+  const q=[];
+  selected.forEach(({seq,scan})=>{
+    _karteRowsFor(scan).forEach(row=>{
+      const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
+      KARTE_FIELDS.forEach(fd=>{
+        const v=row[fd.key];
+        if(v===''||v==null)return;
+        q.push({seq,kindLabel,fieldLabel:fd.label,value:String(v)});
+      });
+    });
+  });
+  return q;
+};
+const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
+  const cardsHtml=selected.map(entry=>_karteExportCardHtml(entry,dispId,idLabel)).join('');
+  const queue=_karteExportQueue(selected);
+  // script終了タグによるHTML破壊を避けるため "<" をUnicodeエスケープしてJSリテラルへ埋め込む
+  const queueJson=JSON.stringify(queue).replace(/</g,'\\u003c');
+  const firstSeq=selected[0]?.seq||'';
+  const lastSeq=selected[selected.length-1]?.seq||'';
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>カルテ転記 ${h(farm.name||'')} ${h(date||'')}</title>
+<style>
+  :root{--navy:#1e3a5f;--navy-2:#274870;--text-1:#1a1a1a;--text-2:#444;--text-3:#777;--text-4:#aaa;--border:#ddd;--border-2:#e5e5e5;--bg:#f4f6f8;--card-bg:#fff;--primary:#2563eb}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Hiragino Sans,Meiryo,sans-serif;background:var(--bg);color:var(--text-1);padding:16px}
+  .kx-hdbar{max-width:820px;margin:0 auto 16px}
+  .kx-title{font-size:18px;font-weight:800;color:var(--navy)}
+  .kx-sub{font-size:13px;color:var(--text-3);margin-top:2px}
+  .kx-toolbar{max-width:820px;margin:0 auto 16px;position:sticky;top:8px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .kx-nextbtn{font-size:15px;font-weight:700;padding:10px 22px;border:none;border-radius:8px;background:var(--primary);color:#fff;cursor:pointer}
+  .kx-nextbtn:disabled{background:#aab5c4;cursor:default}
+  .kx-resetbtn{font-size:12px;padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--text-2);cursor:pointer}
+  .kx-status{font-size:13px;color:var(--text-2);font-weight:600}
+  .kx-card{max-width:820px;margin:0 auto 14px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .kx-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--border-2);margin-bottom:8px}
+  .kx-no{background:#e8f0fe;color:var(--navy-2);font-weight:800;border-radius:14px;padding:2px 10px;font-size:13px}
+  .kx-tag{font-size:14px}
+  .tag-pre{color:var(--text-3);font-size:13px}
+  .tag-exp{color:var(--navy-2);font-weight:800;font-size:15px;letter-spacing:1px}
+  .tag-cd{color:var(--text-4);font-size:12px}
+  .kx-idlabel{font-size:12px;color:var(--text-3)}
+  .kx-idval{font-weight:800;color:var(--navy-2);background:#eef2f7;border-radius:6px;padding:1px 8px;font-size:14px}
+  .kx-row-sep{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-2)}
+  .kx-kind{font-size:12px;font-weight:800;color:var(--navy-2);margin-bottom:4px}
+  .kx-field{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border-2)}
+  .kx-label{font-size:12px;color:var(--text-3);min-width:96px;flex-shrink:0}
+  .kx-value{flex:1;font-size:13px;color:var(--text-1);word-break:break-all}
+  .kx-value.kx-empty{color:var(--text-4)}
+  .kx-copybtn{font-size:13px;padding:3px 9px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer}
+  .kx-copybtn:active{background:#eef2f7}
+  .kx-footer{max-width:820px;margin:20px auto 0;font-size:11px;color:var(--text-4);text-align:center}
+</style>
+</head>
+<body>
+  <div class="kx-hdbar">
+    <div class="kx-title">カルテ転記（担当分書き出し）</div>
+    <div class="kx-sub">${h(farm.name||'')}　検査日：${h(fmtDate(date))}　連番 No.${firstSeq}〜No.${lastSeq}</div>
+  </div>
+  <div class="kx-toolbar">
+    <button class="kx-nextbtn" id="kx-nextbtn" onclick="kxNextCopy()">次をコピー ▶</button>
+    <button class="kx-resetbtn" onclick="kxResetSeq()">↺ 先頭に戻る</button>
+    <div class="kx-status" id="kx-status"></div>
+  </div>
+  ${cardsHtml}
+  <div class="kx-footer">このファイルはオフラインで動作します（アプリ本体・ネットワーク接続は不要です）</div>
+<script>
+(function(){
+  var QUEUE = ${queueJson};
+  var idx = 0;
+  function copyText(text, done){
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done||function(){}).catch(function(){ copyFallback(text, done); });
+      }else{ copyFallback(text, done); }
+    }catch(e){ copyFallback(text, done); }
+  }
+  function copyFallback(text, done){
+    try{
+      var ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(done)done();
+    }catch(e){}
+  }
+  function updateStatus(){
+    var btn=document.getElementById('kx-nextbtn');
+    var st=document.getElementById('kx-status');
+    if(!QUEUE.length){ st.textContent='対象データがありません'; btn.disabled=true; return; }
+    if(idx>=QUEUE.length){ st.textContent='完了'; btn.disabled=true; return; }
+    var cur=QUEUE[idx];
+    st.textContent='現在：No.'+cur.seq+' / '+cur.kindLabel+' / '+cur.fieldLabel+'　（'+(idx+1)+'/'+QUEUE.length+'）';
+    btn.disabled=false;
+  }
+  window.kxNextCopy=function(){
+    if(idx>=QUEUE.length)return;
+    var item=QUEUE[idx];
+    idx++;
+    copyText(item.value);
+    updateStatus();
+  };
+  window.kxResetSeq=function(){ idx=0; updateStatus(); };
+  window.kxCopyClick=function(btnEl){
+    var v = btnEl && btnEl.dataset ? btnEl.dataset.copy : '';
+    var orig = btnEl ? btnEl.textContent : '';
+    copyText(v, function(){
+      if(btnEl){ btnEl.textContent='✓'; setTimeout(function(){ btnEl.textContent=orig; },900); }
+    });
+  };
+  updateStatus();
+})();
+<\/script>
+</body>
+</html>`;
+};
+const renderKarte=()=>{
+  const fid=DB.activeId();
+  const farm=fid?DB.getFarm(fid):null;
+  if(!farm){renderHome();return;}
+  const animals=DB.getAnimals(fid);
+  const dispId=makeDispId(fid,animals);
+  const idLabel=idModeLabel(fid);
+  const realScans=DB.getScans(fid).filter(isRealScan);
+  const dates=[...new Set(realScans.map(s=>s.scanDate))].filter(Boolean).sort((a,b)=>b.localeCompare(a));
+  if(!KV.date||!dates.includes(KV.date)) KV.date=dates[0]||null;
+  const dayScans=KV.date?realScans.filter(s=>s.scanDate===KV.date):[];
+  // 固定連番：scanDate→createdAt 昇順の安定ソートで No.1..N を付与（スキップしても振り直さない）
+  const sorted=dayScans.slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||(a.createdAt||'').localeCompare(b.createdAt||''));
+  const numbered=sorted.map((s,i)=>({seq:i+1,scan:s}));
+  KV.seqQueue=_karteBuildQueue(numbered);
+  if(KV.seqIdx>KV.seqQueue.length)KV.seqIdx=KV.seqQueue.length;
+  if(KV.seqIdx<0)KV.seqIdx=0;
+  const statusHtml=(()=>{
+    if(!KV.seqQueue.length)return '対象データがありません';
+    if(KV.seqIdx>=KV.seqQueue.length)return '完了';
+    const cur=KV.seqQueue[KV.seqIdx];
+    return `現在：No.${cur.seq} / ${h(cur.kindLabel)} / ${h(cur.fieldLabel)}　（${KV.seqIdx+1}/${KV.seqQueue.length}）`;
+  })();
+  setView(`
+  <div class="page-hd">
+    <div class="page-title">カルテ転記</div>
+    <div class="page-sub">${h(farm.name)}　検査日を選択し、①〜⑥をAccess側カルテへコピー転記します</div>
+  </div>
+  <div style="max-width:900px;margin:0 auto;padding:0 12px 60px">
+    ${!dates.length?`<div class="callout cl-blue"><div class="callout-i">💡</div><div>この農場にはまだ検査記録がありません。</div></div>`:`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <label style="font-size:13px;font-weight:600;color:var(--text-2)">検査日</label>
+      <select class="form-select" style="max-width:240px" onchange="App.karteSetDate(this.value)">
+        ${dates.map(d=>`<option value="${d}"${d===KV.date?' selected':''}>${fmtDate(d)}（${realScans.filter(s=>s.scanDate===d).length}頭）</option>`).join('')}
+      </select>
+    </div>
+    <div class="card" style="position:sticky;top:8px;z-index:5">
+      <div class="card-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <button class="btn-primary" style="font-size:15px;padding:10px 22px"${KV.seqIdx>=KV.seqQueue.length?' disabled':''} onclick="App.karteNextCopy()">次をコピー ▶</button>
+        <button class="btn-sm btn-outline" onclick="App.karteResetSeq()">↺ 先頭に戻る</button>
+        <div style="font-size:13px;color:var(--text-2);font-weight:600">${statusHtml}</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="font-size:13px;font-weight:700;color:var(--text-2)">担当分を書き出し</div>
+        <label style="font-size:12px;color:var(--text-3)">連番</label>
+        <input type="number" class="form-input" id="karte-exp-from" value="1" min="1" max="${numbered.length}" style="width:70px">
+        <span style="color:var(--text-3)">〜</span>
+        <input type="number" class="form-input" id="karte-exp-to" value="${numbered.length}" min="1" max="${numbered.length}" style="width:70px">
+        <button class="btn-sm btn-outline" onclick="App.karteExport()">📄 HTMLを書き出し</button>
+        <div style="font-size:11px;color:var(--text-4);width:100%">選択範囲の個体をオフラインで転記できる単一HTMLファイルとして書き出します（スキップ設定は反映されません）</div>
+      </div>
+    </div>
+    ${numbered.map(entry=>_karteCardHtml(entry,dispId,idLabel)).join('')}
+    `}
+  </div>
+  `);
+};
+
 // ─── App Controller ───────────────────────────────
 const App={
   otitisEditCtx:null,
   swabEditCtx:null,
   nav(p){this.closeModal();Router.nav(p);this.closeMenus();},
+  kmChange(kind,id,field,val){
+    const r=(KMS&&KMS[kind]||[]).find(x=>x.id===id);if(r)r[field]=val;
+  },
+  kmAdd(kind){
+    const r={id:genId(),name:'',code:''};
+    KMS[kind].push(r);
+    const tbody=$(`km-${kind}-tbody`);if(!tbody)return;
+    tbody.insertAdjacentHTML('beforeend',_kmRowHtml(kind,r));
+  },
+  kmDel(kind,id){
+    KMS[kind]=KMS[kind].filter(x=>x.id!==id);
+    const row=$(`km-${kind}-${id}`);if(row)row.remove();
+  },
+  kmSave(){
+    Masters.saveDrugs(KMS.drugs);
+    Masters.saveProcs(KMS.procs);
+    toast('カルテ用マスタを保存しました','ok');
+  },
+
+  // カルテ転記ビュー
+  karteSetDate(v){KV.date=v;KV.skip=new Set();KV.seqIdx=0;renderKarte();},
+  karteToggleSkip(scanId){
+    if(KV.skip.has(scanId))KV.skip.delete(scanId);else KV.skip.add(scanId);
+    renderKarte();
+  },
+  karteNextCopy(){
+    if(KV.seqIdx>=KV.seqQueue.length)return;
+    const item=KV.seqQueue[KV.seqIdx];
+    KV.seqIdx++;
+    this.copyText(item.value);
+    renderKarte();
+  },
+  karteResetSeq(){KV.seqIdx=0;renderKarte();},
+  karteExport(){
+    const fromEl=$('karte-exp-from'),toEl=$('karte-exp-to');
+    const from=parseInt(fromEl?.value,10),to=parseInt(toEl?.value,10);
+    if(!Number.isFinite(from)||!Number.isFinite(to)||from<1||to<1||from>to){
+      toast('連番の範囲が正しくありません','err');return;
+    }
+    this.exportKarteHtml(from,to);
+  },
+  exportKarteHtml(fromSeq,toSeq){
+    const fid=DB.activeId();
+    const farm=fid?DB.getFarm(fid):null;
+    if(!farm){toast('農場が見つかりません','err');return;}
+    const animals=DB.getAnimals(fid);
+    const dispId=makeDispId(fid,animals);
+    const idLabel=idModeLabel(fid);
+    const realScans=DB.getScans(fid).filter(isRealScan);
+    const dayScans=KV.date?realScans.filter(s=>s.scanDate===KV.date):[];
+    const sorted=dayScans.slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||(a.createdAt||'').localeCompare(b.createdAt||''));
+    const numbered=sorted.map((s,i)=>({seq:i+1,scan:s}));
+    const selected=numbered.filter(e=>e.seq>=fromSeq&&e.seq<=toSeq);
+    if(!selected.length){toast('指定範囲に該当する記録がありません','err');return;}
+    const html=_karteExportDoc(farm,KV.date,idLabel,dispId,selected);
+    const blob=new Blob([html],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const safe=s=>String(s||'').replace(/[\\/:*?"<>|]/g,'_');
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`カルテ転記_${safe(farm.name)}_${safe(KV.date)}_${fromSeq}-${toSeq}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast('HTMLファイルを書き出しました','ok');
+  },
+  karteCopyClick(btnEl){
+    const v=btnEl?.dataset?.copy||'';
+    this.copyText(v,btnEl);
+  },
+  copyText(text,btnEl){
+    const done=()=>{ if(btnEl){ const o=btnEl.textContent; btnEl.textContent='✓'; setTimeout(()=>{btnEl.textContent=o;},900);} };
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done).catch(()=>this._copyFallback(text,done)); }
+      else this._copyFallback(text, done);
+    }catch(e){ this._copyFallback(text, done); }
+  },
+  _copyFallback(text, done){
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done&&done(); }catch(e){}
+  },
   setGuideTab(tab){GS.tab=tab==='pamphlet'?'pamphlet':'guide';renderGuide();},
   toggleMenu(id){const el=document.getElementById(id);if(!el)return;const o=el.classList.contains('open');this.closeMenus();if(!o)el.classList.add('open');},
   closeMenus(){document.querySelectorAll('.tb-menu.open').forEach(m=>m.classList.remove('open'));},
@@ -6428,6 +6889,21 @@ const App={
       b.classList.toggle('active',b.dataset.val===v);
     });
   },
+  renderScanDrugRows(){
+    const c=$('drug-items');if(!c)return;
+    c.innerHTML=SS.drugItems.map((it,i)=>_scanDrugRowHtml(it,i)).join('');
+  },
+  scanDrugAdd(){
+    SS.drugItems.push({drugId:'',qty:''});
+    this.renderScanDrugRows();
+  },
+  scanDrugDel(i){
+    SS.drugItems.splice(i,1);
+    this.renderScanDrugRows();
+  },
+  scanDrugChange(i,field,val){
+    if(SS.drugItems[i])SS.drugItems[i][field]=val;
+  },
   onScore(v){
     SS.score=parseInt(v)||0;
     const sl=$('f-score');if(sl)sl.value=SS.score;
@@ -6491,7 +6967,10 @@ const App={
     const treatType=presentOnly?'':SS.treatType||''; // '' | 'new' | 'ongoing'
     // 治療中の場合は手入力の初診日を使用、治療介入(new)の場合はスキャン日が初診日（firstDiagDate不要）
     const firstDiagDate=(!presentOnly&&treatType==='ongoing')?($('f-firstdiag')?.value||''):'';
-    const scan={farmId:fid,animalId:animal.id,tagId,scanDate,ageAtScan,round,chestGirth,...(presentOnly?{presentOnly:true,right:{},left:{},obScore:null,mainFindings:'',treated:false,treatType:'',drug:'',notes:$('f-notes').value.trim()}:{right:{...SS.right},left:{...SS.left},obScore:score,mainFindings:$('f-findings').value.trim(),treated:!!treatType,treatType,...(firstDiagDate?{firstDiagDate}:{}),drug:$('f-drug')?.value.trim()||'',notes:$('f-notes').value.trim()}),...(hutchId?{hutchId}:{}),...(hutchFree&&!hutchId?{hutchFree}:{})};
+    const _bodyTemp=(function(){ const v = parseFloat($('f-bodytemp')?.value); return isNaN(v)?null:v; })();
+    const _drugItems=(SS.drugItems||[]).filter(it=>it.drugId).map(it=>({drugId:it.drugId, qty:(it.qty||'').toString().trim()}));
+    const _drugItemNames=_drugItems.map(it=>{const d=Masters.drugs().find(x=>x.id===it.drugId);return d?d.name:'';}).filter(Boolean).join('、');
+    const scan={farmId:fid,animalId:animal.id,tagId,scanDate,ageAtScan,round,chestGirth,...(presentOnly?{presentOnly:true,right:{},left:{},obScore:null,mainFindings:'',treated:false,treatType:'',drug:'',notes:$('f-notes').value.trim()}:{right:{...SS.right},left:{...SS.left},obScore:score,mainFindings:$('f-findings').value.trim(),treated:!!treatType,treatType,...(firstDiagDate?{firstDiagDate}:{}),drug:_drugItems.length?_drugItemNames:($('f-drug')?.value.trim()||''),bodyTemp:_bodyTemp,procedures:{swab:!!$('f-swab')?.checked},drugItems:_drugItems,notes:$('f-notes').value.trim()}),...(hutchId?{hutchId}:{}),...(hutchFree&&!hutchId?{hutchFree}:{})};
     if(SS.editId){scan.id=SS.editId;DB.updateScan(fid,scan);toast('記録を更新しました','ok');}
     else{DB.addScan(fid,scan);toast(presentOnly?`${tagId} の在舎記録を保存しました`:`${tagId} のスキャンを保存しました（スコア ${score}）`,'ok');}
     // ハッチが指定されている場合、同個体の同日以降のスキャンに反映
@@ -7095,6 +7574,8 @@ const App={
     Router.on('/exam-memo',()=>renderExamMemo());
     Router.on('/hatch-map',()=>renderHatchMap());
     Router.on('/pen-map',()=>renderPenMap());
+    Router.on('/karte-master',()=>renderKarteMaster());
+    Router.on('/karte',()=>renderKarte());
     (async ()=>{
       DB.clearStartupCache();
       if(FileStore._supported()) await _idbSet('fileHandle', null);
@@ -7115,6 +7596,7 @@ App.init();
 document.addEventListener('click',e=>{if(!e.target.closest('.tb-menu'))App.closeMenus();});
 </script>
   <script>window.DN_APP='LU';</script>
+  <script src="karte-logic.js"></script>
   <script src="license-core.js"></script>
   <script src="license.min.js"></script>
 </body>
