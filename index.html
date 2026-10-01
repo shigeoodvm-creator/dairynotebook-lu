@@ -5569,7 +5569,7 @@ const renderKarteMaster=renderSettings;
 
 // ─── KARTE 転記ビュー（連番・スキップ・順送りコピー） ───────
 // KV: ビュー内一時状態。date=選択中の検査日／skip=除外scanIdのSet／seqIdx・seqQueue=順送りコピー用
-let KV={date:null,skip:new Set(),seqIdx:0,seqQueue:[]};
+let KV={date:null,skip:new Set(),pick:new Set(),seqIdx:0,seqQueue:[]};
 const KARTE_KIND_LABEL={echo:'超音波検査',culture:'細菌培養',pcr:'PCR検査',drug:'投薬'};
 const KARTE_FIELDS=[
   {key:'date',label:'①日付'},
@@ -5650,6 +5650,7 @@ const _karteCardHtml=(entry,dispId,idLabel)=>{
         <span class="badge ${roundInfo.cls}" style="margin-left:10px">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
       </div>
       <div class="card-hd-sub" style="display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);cursor:pointer"><input type="checkbox"${KV.pick.has(scan.id)?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)">書き出し</label>
         ${skipped?'<span class="badge b-amber">⏭️ 別形態で記録</span>':''}
         <button class="btn-sm ${skipped?'btn-primary':'btn-outline'}" onclick="App.karteToggleSkip('${scan.id}')">${skipped?'スキップ解除':'スキップ'}</button>
       </div>
@@ -5870,8 +5871,13 @@ const renderKarte=()=>{
         <input type="number" class="form-input" id="karte-exp-from" value="1" min="1" max="${numbered.length}" style="width:70px">
         <span style="color:var(--text-3)">〜</span>
         <input type="number" class="form-input" id="karte-exp-to" value="${numbered.length}" min="1" max="${numbered.length}" style="width:70px">
-        <button class="btn-sm btn-outline" onclick="App.karteExport()">📄 HTMLを書き出し</button>
-        <div style="font-size:11px;color:var(--text-4);width:100%">選択範囲の個体をオフラインで転記できる単一HTMLファイルとして書き出します（スキップ設定は反映されません）</div>
+        <button class="btn-sm btn-outline" onclick="App.karteExport()">📄 範囲をHTML書き出し</button>
+        <div style="width:100%;height:0"></div>
+        <label style="font-size:12px;color:var(--text-3)">チェックした個体</label>
+        <span id="karte-pick-count" style="font-size:13px;font-weight:700;color:var(--text-1)">${numbered.filter(e=>KV.pick.has(e.scan.id)).length}頭</span>
+        <button class="btn-sm btn-outline" onclick="App.karteExportPicked()">📄 チェック分をHTML書き出し</button>
+        <button class="btn-sm btn-ghost" onclick="App.kartePickClear()">チェックを全解除</button>
+        <div style="font-size:11px;color:var(--text-4);width:100%">連番の範囲指定、または各個体の「書き出し」チェックで選んだ個体を、オフラインで転記できる単一HTMLファイルとして書き出します（スキップ設定は反映されません）</div>
       </div>
     </div>
     ${numbered.map(entry=>_karteCardHtml(entry,dispId,idLabel)).join('')}
@@ -5905,7 +5911,13 @@ const App={
   },
 
   // カルテ転記ビュー
-  karteSetDate(v){KV.date=v;KV.skip=new Set();KV.seqIdx=0;renderKarte();},
+  karteSetDate(v){KV.date=v;KV.skip=new Set();KV.pick=new Set();KV.seqIdx=0;renderKarte();},
+  kartePickToggle(scanId,on){
+    if(on)KV.pick.add(scanId);else KV.pick.delete(scanId);
+    // 再描画せずに件数表示のみ更新（スクロール位置を保持）
+    const el=$('karte-pick-count');if(el)el.textContent=`${this._karteNumbered().filter(e=>KV.pick.has(e.scan.id)).length}頭`;
+  },
+  kartePickClear(){KV.pick=new Set();renderKarte();},
   karteToggleSkip(scanId){
     if(KV.skip.has(scanId))KV.skip.delete(scanId);else KV.skip.add(scanId);
     renderKarte();
@@ -5924,28 +5936,38 @@ const App={
     if(!Number.isFinite(from)||!Number.isFinite(to)||from<1||to<1||from>to){
       toast('連番の範囲が正しくありません','err');return;
     }
-    this.exportKarteHtml(from,to);
+    const selected=this._karteNumbered().filter(e=>e.seq>=from&&e.seq<=to);
+    if(!selected.length){toast('指定範囲に該当する記録がありません','err');return;}
+    this.exportKarteHtml(selected,`${from}-${to}`);
   },
-  exportKarteHtml(fromSeq,toSeq){
+  karteExportPicked(){
+    const selected=this._karteNumbered().filter(e=>KV.pick.has(e.scan.id));
+    if(!selected.length){toast('書き出す個体にチェックを入れてください','err');return;}
+    this.exportKarteHtml(selected,`選択${selected.length}頭`);
+  },
+  // 表示中の検査日の記録を固定連番付きで返す（renderKarte と同じ並び）
+  _karteNumbered(){
+    const fid=DB.activeId();
+    if(!fid)return [];
+    const realScans=DB.getScans(fid).filter(isRealScan);
+    const dayScans=KV.date?realScans.filter(s=>s.scanDate===KV.date):[];
+    const sorted=dayScans.slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||(a.createdAt||'').localeCompare(b.createdAt||''));
+    return sorted.map((s,i)=>({seq:i+1,scan:s}));
+  },
+  exportKarteHtml(selected,suffix){
     const fid=DB.activeId();
     const farm=fid?DB.getFarm(fid):null;
     if(!farm){toast('農場が見つかりません','err');return;}
     const animals=DB.getAnimals(fid);
     const dispId=makeDispId(fid,animals);
     const idLabel=idModeLabel(fid);
-    const realScans=DB.getScans(fid).filter(isRealScan);
-    const dayScans=KV.date?realScans.filter(s=>s.scanDate===KV.date):[];
-    const sorted=dayScans.slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||(a.createdAt||'').localeCompare(b.createdAt||''));
-    const numbered=sorted.map((s,i)=>({seq:i+1,scan:s}));
-    const selected=numbered.filter(e=>e.seq>=fromSeq&&e.seq<=toSeq);
-    if(!selected.length){toast('指定範囲に該当する記録がありません','err');return;}
     const html=_karteExportDoc(farm,KV.date,idLabel,dispId,selected);
     const blob=new Blob([html],{type:'text/html'});
     const url=URL.createObjectURL(blob);
     const safe=s=>String(s||'').replace(/[\\/:*?"<>|]/g,'_');
     const a=document.createElement('a');
     a.href=url;
-    a.download=`カルテ転記_${safe(farm.name)}_${safe(KV.date)}_${fromSeq}-${toSeq}.html`;
+    a.download=`カルテ転記_${safe(farm.name)}_${safe(KV.date)}_${safe(suffix)}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
