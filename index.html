@@ -198,6 +198,36 @@ input,select,textarea{font-family:inherit}
 .card-hd-icon.red{background:var(--red-lt);color:var(--red)}
 .card-hd-title{font-size:14px;font-weight:700;color:var(--text)}
 .card-hd-sub{font-size:12px;color:var(--text-3);margin-left:auto}
+/* カルテ転記：個体カード */
+.kc{background:#fff;border:1px solid #c5d0dc;border-radius:12px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 6px rgba(13,33,55,.10)}
+.kc.kc-picked{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.45),0 2px 6px rgba(13,33,55,.10)}
+.kc.kc-skipped{opacity:.55;filter:grayscale(.7)}
+.kc-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:10px 16px}
+.kc-pick{display:flex;align-items:center;cursor:pointer;padding:4px;margin:-4px 0 -4px -4px}
+.kc-pick input{width:22px;height:22px;cursor:pointer;accent-color:#f59e0b}
+.kc-no{background:#fff;color:var(--navy-2);font-weight:800;font-size:15px;border-radius:14px;padding:2px 12px;flex-shrink:0}
+.kc-tag{font-size:13px;color:#cbd5e1;letter-spacing:.5px}
+.kc-tag .tag-pre,.kc-tag .tag-cd{color:#cbd5e1;background:transparent}
+.kc-tag .tag-exp{color:#fff;background:rgba(255,255,255,.15);font-weight:800}
+.kc-idlbl{font-size:12px;color:#cbd5e1}
+.kc-id{background:#fde68a;color:var(--navy-2);font-weight:800;font-size:17px;letter-spacing:2px;border-radius:6px;padding:1px 10px}
+.kc-round{font-size:12px;font-weight:700;border-radius:12px;padding:3px 10px}
+.kc-round.first{background:#ef4444;color:#fff}
+.kc-round.follow{background:#dbeafe;color:#1e40af}
+.kc-round.unknown{background:#e5e7eb;color:#374151}
+.kc-hd-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.kc-skipbtn{background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:6px;font-size:12px;padding:4px 10px;cursor:pointer}
+.kc-skipbtn.on{background:#fff;color:var(--navy-2);font-weight:700}
+.kc-body{padding:12px 16px 14px}
+.kc-kind{display:inline-block;font-size:13px;font-weight:800;color:var(--navy-2);border-left:4px solid var(--navy);padding:1px 0 1px 8px;margin:4px 0 6px}
+.kc-kind-sep{margin-top:14px;padding-top:12px;border-top:2px solid #e2e8f0}
+.kc-rows{border:1px solid #d5dde7;border-radius:6px;overflow:hidden}
+.kc-row{display:flex;align-items:stretch;border-top:1px solid #e2e8f0}
+.kc-row:first-child{border-top:none}
+.kc-lbl{width:110px;flex-shrink:0;background:#eef2f7;color:#334155;font-size:12px;font-weight:700;padding:7px 10px;display:flex;align-items:center}
+.kc-val{flex:1;font-size:14px;color:#0f172a;font-weight:600;padding:7px 10px;word-break:break-all;display:flex;align-items:center}
+.kc-val.kc-none{color:#b6bfcb;font-weight:400}
+.kc-copy{display:flex;align-items:center;padding:0 6px;min-width:44px;justify-content:center}
 .card-body{padding:20px 22px}
 .card-body.tight{padding:14px 22px}
 
@@ -5568,8 +5598,8 @@ const renderSettings=()=>{
 const renderKarteMaster=renderSettings;
 
 // ─── KARTE 転記ビュー（連番・スキップ・順送りコピー） ───────
-// KV: ビュー内一時状態。date=選択中の検査日／skip=除外scanIdのSet／seqIdx・seqQueue=順送りコピー用
-let KV={date:null,skip:new Set(),pick:new Set(),seqIdx:0,seqQueue:[]};
+// KV: ビュー内一時状態。date=選択中の検査日／skip=除外scanIdのSet／pick=書き出し対象scanIdのSet
+let KV={date:null,skip:new Set(),pick:new Set()};
 const KARTE_KIND_LABEL={echo:'超音波検査',culture:'細菌培養',pcr:'PCR検査',drug:'投薬'};
 const KARTE_FIELDS=[
   {key:'date',label:'①日付'},
@@ -5595,36 +5625,19 @@ const _karteCodeDisplay=(row,fd)=>{
   }
   return v;
 };
-// 選択日・スキップ状態から順送りキューを再構築（空欄項目は除外）
-const _karteBuildQueue=(numbered)=>{
-  const q=[];
-  numbered.forEach(({seq,scan})=>{
-    if(KV.skip.has(scan.id))return;
-    _karteRowsFor(scan).forEach(row=>{
-      const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
-      KARTE_FIELDS.forEach(fd=>{
-        const v=row[fd.key];
-        if(v===''||v==null)return;
-        q.push({seq,kindLabel,fieldLabel:fd.label,value:String(v)});
-      });
-    });
-  });
-  return q;
-};
 const _karteFieldHtml=(label,value,displayValue=value)=>{
   const has=value!==''&&value!=null;
-  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border-2)">
-    <span style="font-size:12px;color:var(--text-3);min-width:96px;flex-shrink:0">${label}</span>
-    <span style="flex:1;font-size:13px;color:${has?'var(--text-1)':'var(--text-4)'};word-break:break-all">${has?h(displayValue):'－'}</span>
-    ${has?`<button class="btn-sm btn-ghost" data-copy="${h(value)}" onclick="App.karteCopyClick(this)">📋</button>`:''}
+  return `<div class="kc-row">
+    <span class="kc-lbl">${label}</span>
+    <span class="kc-val${has?'':' kc-none'}">${has?h(displayValue):'－'}</span>
+    <span class="kc-copy">${has?`<button class="btn-sm btn-ghost" data-copy="${h(value)}" onclick="App.karteCopyClick(this)">📋</button>`:''}</span>
   </div>`;
 };
 const _karteRowHtml=(row,idx)=>{
   const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
-  const sep=idx>0;
-  return `<div style="${sep?'margin-top:12px;padding-top:12px;border-top:1px solid var(--border-2)':''}">
-    <div style="font-size:12px;font-weight:800;color:var(--navy-2);margin-bottom:4px">${h(kindLabel)}</div>
-    ${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd))).join('')}
+  return `<div${idx>0?' class="kc-kind-sep"':''}>
+    <div class="kc-kind">${h(kindLabel)}</div>
+    <div class="kc-rows">${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd))).join('')}</div>
   </div>`;
 };
 const _karteRoundInfo=(scan)=>{
@@ -5640,22 +5653,22 @@ const _karteCardHtml=(entry,dispId,idLabel)=>{
   const rows=_karteRowsFor(scan);
   const tag=scan.tagId||'';
   const roundInfo=_karteRoundInfo(scan);
-  return `<div class="card"${skipped?' style="opacity:.55;filter:grayscale(.7)"':''}>
-    <div class="card-hd" style="flex-wrap:wrap">
-      <div class="card-hd-icon blue" style="width:auto;min-width:30px;padding:0 9px;border-radius:14px;font-weight:800">No.${seq}</div>
-      <div class="card-hd-title">
-        ${fmtTagId(tag)}
-        <span style="margin-left:10px;font-size:12px;color:var(--text-3)">${h(idLabel)}：</span>
-        <span class="tag-exp-lg" style="font-size:15px;padding:1px 8px">${h(dispId(tag))}</span>
-        <span class="badge ${roundInfo.cls}" style="margin-left:10px">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
-      </div>
-      <div class="card-hd-sub" style="display:flex;align-items:center;gap:8px">
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);cursor:pointer"><input type="checkbox"${KV.pick.has(scan.id)?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)">書き出し</label>
+  const picked=KV.pick.has(scan.id);
+  const roundCls=roundInfo.cls==='b-gray'?'unknown':(roundInfo.first?'first':'follow');
+  return `<div class="kc${picked?' kc-picked':''}${skipped?' kc-skipped':''}" id="kc-${scan.id}">
+    <div class="kc-hd">
+      <label class="kc-pick" title="書き出し対象にする"><input type="checkbox"${picked?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)"></label>
+      <span class="kc-no">No.${seq}</span>
+      <span class="kc-tag">${fmtTagId(tag)}</span>
+      <span class="kc-idlbl">${h(idLabel)}</span>
+      <span class="kc-id">${h(dispId(tag))}</span>
+      <span class="kc-round ${roundCls}">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
+      <div class="kc-hd-right">
         ${skipped?'<span class="badge b-amber">⏭️ 別形態で記録</span>':''}
-        <button class="btn-sm ${skipped?'btn-primary':'btn-outline'}" onclick="App.karteToggleSkip('${scan.id}')">${skipped?'スキップ解除':'スキップ'}</button>
+        <button class="kc-skipbtn${skipped?' on':''}" onclick="App.karteToggleSkip('${scan.id}')">${skipped?'スキップ解除':'スキップ'}</button>
       </div>
     </div>
-    <div class="card-body">
+    <div class="kc-body">
       ${rows.map((r,i)=>_karteRowHtml(r,i)).join('')}
     </div>
   </div>`;
@@ -5835,19 +5848,10 @@ const renderKarte=()=>{
   // 固定連番：scanDate→createdAt 昇順の安定ソートで No.1..N を付与（スキップしても振り直さない）
   const sorted=dayScans.slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||(a.createdAt||'').localeCompare(b.createdAt||''));
   const numbered=sorted.map((s,i)=>({seq:i+1,scan:s}));
-  KV.seqQueue=_karteBuildQueue(numbered);
-  if(KV.seqIdx>KV.seqQueue.length)KV.seqIdx=KV.seqQueue.length;
-  if(KV.seqIdx<0)KV.seqIdx=0;
-  const statusHtml=(()=>{
-    if(!KV.seqQueue.length)return '対象データがありません';
-    if(KV.seqIdx>=KV.seqQueue.length)return '完了';
-    const cur=KV.seqQueue[KV.seqIdx];
-    return `現在：No.${cur.seq} / ${h(cur.kindLabel)} / ${h(cur.fieldLabel)}　（${KV.seqIdx+1}/${KV.seqQueue.length}）`;
-  })();
   setView(`
   <div class="page-hd">
     <div class="page-title">カルテ転記</div>
-    <div class="page-sub">${h(farm.name)}　検査日を選択し、①〜⑥をAccess側カルテへコピー転記します</div>
+    <div class="page-sub">${h(farm.name)}　検査日を選択し、①〜⑥を📋でAccess側カルテへコピー転記します</div>
   </div>
   <div style="max-width:900px;margin:0 auto;padding:0 12px 60px">
     ${!dates.length?`<div class="callout cl-blue"><div class="callout-i">💡</div><div>この農場にはまだ検査記録がありません。</div></div>`:`
@@ -5857,14 +5861,7 @@ const renderKarte=()=>{
         ${dates.map(d=>`<option value="${d}"${d===KV.date?' selected':''}>${fmtDate(d)}（${realScans.filter(s=>s.scanDate===d).length}頭）</option>`).join('')}
       </select>
     </div>
-    <div class="card" style="position:sticky;top:8px;z-index:5">
-      <div class="card-body" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <button class="btn-primary" style="font-size:15px;padding:10px 22px"${KV.seqIdx>=KV.seqQueue.length?' disabled':''} onclick="App.karteNextCopy()">次をコピー ▶</button>
-        <button class="btn-sm btn-outline" onclick="App.karteResetSeq()">↺ 先頭に戻る</button>
-        <div style="font-size:13px;color:var(--text-2);font-weight:600">${statusHtml}</div>
-      </div>
-    </div>
-    <div class="card" style="margin-top:12px">
+    <div class="card">
       <div class="card-body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="font-size:13px;font-weight:700;color:var(--text-2)">担当分を書き出し</div>
         <label style="font-size:12px;color:var(--text-3)">連番</label>
@@ -5911,9 +5908,10 @@ const App={
   },
 
   // カルテ転記ビュー
-  karteSetDate(v){KV.date=v;KV.skip=new Set();KV.pick=new Set();KV.seqIdx=0;renderKarte();},
+  karteSetDate(v){KV.date=v;KV.skip=new Set();KV.pick=new Set();renderKarte();},
   kartePickToggle(scanId,on){
     if(on)KV.pick.add(scanId);else KV.pick.delete(scanId);
+    const card=$(`kc-${scanId}`);if(card)card.classList.toggle('kc-picked',on);
     // 再描画せずに件数表示のみ更新（スクロール位置を保持）
     const el=$('karte-pick-count');if(el)el.textContent=`${this._karteNumbered().filter(e=>KV.pick.has(e.scan.id)).length}頭`;
   },
@@ -5922,14 +5920,6 @@ const App={
     if(KV.skip.has(scanId))KV.skip.delete(scanId);else KV.skip.add(scanId);
     renderKarte();
   },
-  karteNextCopy(){
-    if(KV.seqIdx>=KV.seqQueue.length)return;
-    const item=KV.seqQueue[KV.seqIdx];
-    KV.seqIdx++;
-    this.copyText(item.value);
-    renderKarte();
-  },
-  karteResetSeq(){KV.seqIdx=0;renderKarte();},
   karteExport(){
     const fromEl=$('karte-exp-from'),toEl=$('karte-exp-to');
     const from=parseInt(fromEl?.value,10),to=parseInt(toEl?.value,10);
