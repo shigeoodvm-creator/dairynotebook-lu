@@ -198,37 +198,16 @@ input,select,textarea{font-family:inherit}
 .card-hd-icon.red{background:var(--red-lt);color:var(--red)}
 .card-hd-title{font-size:14px;font-weight:700;color:var(--text)}
 .card-hd-sub{font-size:12px;color:var(--text-3);margin-left:auto}
-/* カルテ転記：個体カード */
-.kc{background:#fff;border:1px solid #c5d0dc;border-radius:12px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 6px rgba(13,33,55,.10)}
-.kc.kc-picked{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.45),0 2px 6px rgba(13,33,55,.10)}
-.kc.kc-skipped{opacity:.55;filter:grayscale(.7)}
-.kc-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:10px 16px}
-.kc-pick{display:flex;align-items:center;cursor:pointer;padding:4px;margin:-4px 0 -4px -4px}
-.kc-pick input{width:22px;height:22px;cursor:pointer;accent-color:#f59e0b}
-.kc-no{background:#fff;color:var(--navy-2);font-weight:800;font-size:15px;border-radius:14px;padding:2px 12px;flex-shrink:0}
-.kc-tag{font-size:13px;color:#cbd5e1;letter-spacing:.5px}
-.kc-tag .tag-pre,.kc-tag .tag-cd{color:#cbd5e1;background:transparent}
-.kc-tag .tag-exp{color:#fff;background:rgba(255,255,255,.15);font-weight:800}
-.kc-idlbl{font-size:12px;color:#cbd5e1}
-.kc-id{background:#fde68a;color:var(--navy-2);font-weight:800;font-size:17px;letter-spacing:2px;border-radius:6px;padding:1px 10px}
-.kc-round{font-size:12px;font-weight:700;border-radius:12px;padding:3px 10px}
-.kc-round.first{background:#ef4444;color:#fff}
-.kc-round.follow{background:#dbeafe;color:#1e40af}
-.kc-round.unknown{background:#e5e7eb;color:#374151}
-.kc-hd-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.kc-skipbtn{background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:6px;font-size:12px;padding:4px 10px;cursor:pointer}
-.kc-skipbtn.on{background:#fff;color:var(--navy-2);font-weight:700}
-.kc-body{padding:12px 16px 14px}
-.kc-kind{display:inline-block;font-size:13px;font-weight:800;color:var(--navy-2);border-left:4px solid var(--navy);padding:1px 0 1px 8px;margin:4px 0 6px}
-.kc-kind-sep{margin-top:14px;padding-top:12px;border-top:2px solid #e2e8f0}
-.kc-rows{border:1px solid #d5dde7;border-radius:6px;overflow:hidden}
-.kc-row{display:flex;align-items:stretch;border-top:1px solid #e2e8f0}
-.kc-row:first-child{border-top:none}
-.kc-lbl{width:110px;flex-shrink:0;background:#eef2f7;color:#334155;font-size:12px;font-weight:700;padding:7px 10px;display:flex;align-items:center}
-.kc-val{flex:1;font-size:14px;color:#0f172a;font-weight:600;padding:7px 10px;word-break:break-all;display:flex;align-items:center}
-.kc-val.kc-none{color:#b6bfcb;font-weight:400}
-.kc-copy{display:flex;align-items:center;padding:0 6px;min-width:44px;justify-content:center}
 .card-body{padding:20px 22px}
+.kx-panel{border:1px solid #c5d0dc}
+.kx-panel-hd{background:#eef2f7;padding:12px 18px;font-size:14px;font-weight:800;color:var(--navy-2);border-bottom:1px solid #d5dde7}
+.kx-panel-hd span{display:block;font-size:12px;font-weight:500;color:var(--text-3);margin-top:2px}
+.kx-panel-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid #e2e8f0}
+.kx-panel-lbl{width:110px;font-size:13px;font-weight:700;color:var(--navy-2);border-left:4px solid var(--navy);padding-left:8px}
+.kx-panel-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1}
+.kx-panel-count{font-size:16px;font-weight:800;color:var(--navy-2);min-width:40px}
+.kx-panel-btn{font-size:14px;padding:9px 18px;min-width:190px;cursor:pointer}
+.kx-panel-note{padding:9px 18px;font-size:11.5px;color:var(--text-3)}
 .card-body.tight{padding:14px 22px}
 
 /* ─────────────────────────────────────────
@@ -5625,19 +5604,55 @@ const _karteCodeDisplay=(row,fd)=>{
   }
   return v;
 };
-const _karteFieldHtml=(label,value,displayValue=value)=>{
+// 個体カードのCSS（アプリ画面と担当分書き出しHTMLで共用）
+const KARTE_CARD_CSS=`
+.kc{background:#fff;border:1px solid #c5d0dc;border-radius:12px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 6px rgba(13,33,55,.10)}
+.kc.kc-picked{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.45),0 2px 6px rgba(13,33,55,.10)}
+.kc.kc-skipped{opacity:.55;filter:grayscale(.7)}
+.kc-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:10px 16px}
+.kc-pick{display:flex;align-items:center;cursor:pointer;padding:4px;margin:-4px 0 -4px -4px}
+.kc-pick input{width:22px;height:22px;cursor:pointer;accent-color:#f59e0b}
+.kc-no{background:#fff;color:var(--navy-2);font-weight:800;font-size:15px;border-radius:14px;padding:2px 12px;flex-shrink:0}
+.kc-tag{font-size:13px;color:#cbd5e1;letter-spacing:.5px}
+.kc-tag .tag-pre,.kc-tag .tag-cd{color:#cbd5e1;background:transparent}
+.kc-tag .tag-exp{color:#fff;background:rgba(255,255,255,.15);font-weight:800}
+.kc-idlbl{font-size:12px;color:#cbd5e1}
+.kc-id{background:#fde68a;color:var(--navy-2);font-weight:800;font-size:17px;letter-spacing:2px;border-radius:6px;padding:1px 10px}
+.kc-round{font-size:12px;font-weight:700;border-radius:12px;padding:3px 10px}
+.kc-round.first{background:#ef4444;color:#fff}
+.kc-round.follow{background:#dbeafe;color:#1e40af}
+.kc-round.unknown{background:#e5e7eb;color:#374151}
+.kc-hd-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.kc-skipbtn{background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:6px;font-size:12px;padding:4px 10px;cursor:pointer}
+.kc-skipbtn.on{background:#fff;color:var(--navy-2);font-weight:700}
+.kc-body{padding:12px 16px 14px}
+.kc-kind{display:inline-block;font-size:13px;font-weight:800;color:var(--navy-2);border-left:4px solid var(--navy);padding:1px 0 1px 8px;margin:4px 0 6px}
+.kc-kind-sep{margin-top:14px;padding-top:12px;border-top:2px solid #e2e8f0}
+.kc-rows{border:1px solid #d5dde7;border-radius:6px;overflow:hidden}
+.kc-row{display:flex;align-items:stretch;border-top:1px solid #e2e8f0}
+.kc-row:first-child{border-top:none}
+.kc-lbl{width:110px;flex-shrink:0;background:#eef2f7;color:#334155;font-size:12px;font-weight:700;padding:7px 10px;display:flex;align-items:center}
+.kc-val{flex:1;font-size:14px;color:#0f172a;font-weight:600;padding:7px 10px;word-break:break-all;display:flex;align-items:center}
+.kc-val.kc-none{color:#b6bfcb;font-weight:400}
+.kc-copy{display:flex;align-items:center;padding:0 6px;min-width:44px;justify-content:center}
+.kc-copybtn{font-size:13px;padding:4px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer}
+.kc-copybtn:hover{background:#eef2f7}
+.kc-copybtn:active{background:#dbe4ee}
+`;
+document.head.insertAdjacentHTML('beforeend',`<style>${KARTE_CARD_CSS}</style>`);
+const _karteFieldHtml=(label,value,displayValue=value,copyFn='App.karteCopyClick')=>{
   const has=value!==''&&value!=null;
   return `<div class="kc-row">
     <span class="kc-lbl">${label}</span>
     <span class="kc-val${has?'':' kc-none'}">${has?h(displayValue):'－'}</span>
-    <span class="kc-copy">${has?`<button class="btn-sm btn-ghost" data-copy="${h(value)}" onclick="App.karteCopyClick(this)">📋</button>`:''}</span>
+    <span class="kc-copy">${has?`<button class="kc-copybtn" data-copy="${h(value)}" onclick="${copyFn}(this)">📋</button>`:''}</span>
   </div>`;
 };
-const _karteRowHtml=(row,idx)=>{
+const _karteRowHtml=(row,idx,copyFn)=>{
   const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
   return `<div${idx>0?' class="kc-kind-sep"':''}>
     <div class="kc-kind">${h(kindLabel)}</div>
-    <div class="kc-rows">${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd))).join('')}</div>
+    <div class="kc-rows">${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd),copyFn)).join('')}</div>
   </div>`;
 };
 const _karteRoundInfo=(scan)=>{
@@ -5647,89 +5662,40 @@ const _karteRoundInfo=(scan)=>{
   if(!Number.isFinite(n)||n<1)return {text:'肺エコー回数不明',note:'カルテ要確認',cls:'b-gray',first:false};
   return {text:`肺エコー${n}回目`,note:n===1?'初診カルテ作成':'既存カルテ確認',cls:n===1?'b-red':'b-blue',first:n===1};
 };
-const _karteCardHtml=(entry,dispId,idLabel)=>{
+const _karteCardHtml=(entry,dispId,idLabel,forExport=false)=>{
   const {seq,scan}=entry;
-  const skipped=KV.skip.has(scan.id);
+  const skipped=!forExport&&KV.skip.has(scan.id);
   const rows=_karteRowsFor(scan);
   const tag=scan.tagId||'';
   const roundInfo=_karteRoundInfo(scan);
-  const picked=KV.pick.has(scan.id);
+  const picked=!forExport&&KV.pick.has(scan.id);
   const roundCls=roundInfo.cls==='b-gray'?'unknown':(roundInfo.first?'first':'follow');
   return `<div class="kc${picked?' kc-picked':''}${skipped?' kc-skipped':''}" id="kc-${scan.id}">
     <div class="kc-hd">
-      <label class="kc-pick" title="書き出し対象にする"><input type="checkbox"${picked?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)"></label>
+      ${forExport?'':`<label class="kc-pick" title="書き出し対象にする"><input type="checkbox"${picked?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)"></label>`}
       <span class="kc-no">No.${seq}</span>
       <span class="kc-tag">${fmtTagId(tag)}</span>
       <span class="kc-idlbl">${h(idLabel)}</span>
       <span class="kc-id">${h(dispId(tag))}</span>
       <span class="kc-round ${roundCls}">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
-      <div class="kc-hd-right">
+      ${forExport?'':`<div class="kc-hd-right">
         ${skipped?'<span class="badge b-amber">⏭️ 別形態で記録</span>':''}
         <button class="kc-skipbtn${skipped?' on':''}" onclick="App.karteToggleSkip('${scan.id}')">${skipped?'スキップ解除':'スキップ'}</button>
-      </div>
+      </div>`}
     </div>
     <div class="kc-body">
-      ${rows.map((r,i)=>_karteRowHtml(r,i)).join('')}
+      ${rows.map((r,i)=>_karteRowHtml(r,i,forExport?'kxCopyClick':'App.karteCopyClick')).join('')}
     </div>
   </div>`;
 };
 // ─── カルテ転記：担当分HTML書き出し（案B・自己完結） ───────
 // 生成HTMLはアプリ本体・localStorage・ネットワークに依存しない（値は生成時に文字列として焼き込む）
-const _karteExportFieldHtml=(label,value,displayValue=value)=>{
-  const has=value!==''&&value!=null;
-  return `<div class="kx-field">
-    <span class="kx-label">${label}</span>
-    <span class="kx-value${has?'':' kx-empty'}">${has?h(displayValue):'－'}</span>
-    ${has?`<button class="kx-copybtn" data-copy="${h(value)}" onclick="kxCopyClick(this)">📋</button>`:''}
-  </div>`;
-};
-const _karteExportRowHtml=(row,idx)=>{
-  const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
-  return `<div class="kx-row${idx>0?' kx-row-sep':''}">
-    <div class="kx-kind">${h(kindLabel)}</div>
-    ${KARTE_FIELDS.map(fd=>_karteExportFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd))).join('')}
-  </div>`;
-};
-const _karteExportCardHtml=(entry,dispId,idLabel)=>{
-  const {seq,scan}=entry;
-  const rows=_karteRowsFor(scan);
-  const tag=scan.tagId||'';
-  const roundInfo=_karteRoundInfo(scan);
-  return `<div class="kx-card">
-    <div class="kx-hd">
-      <span class="kx-no">No.${seq}</span>
-      <span class="kx-tag">${fmtTagId(tag)}</span>
-      <span class="kx-idlabel">${h(idLabel)}：</span>
-      <span class="kx-idval">${h(dispId(tag))}</span>
-      <span class="kx-round ${roundInfo.first?'kx-round-first':'kx-round-follow'}">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
-    </div>
-    <div class="kx-body">
-      ${rows.map((r,i)=>_karteExportRowHtml(r,i)).join('')}
-    </div>
-  </div>`;
-};
-// 選択範囲から順送りコピー用キューを構築（空欄項目は除外。スキップ概念なし＝範囲内すべて対象）
-const _karteExportQueue=(selected)=>{
-  const q=[];
-  selected.forEach(({seq,scan})=>{
-    _karteRowsFor(scan).forEach(row=>{
-      const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
-      KARTE_FIELDS.forEach(fd=>{
-        const v=row[fd.key];
-        if(v===''||v==null)return;
-        q.push({seq,kindLabel,fieldLabel:fd.label,value:String(v)});
-      });
-    });
-  });
-  return q;
-};
 const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
-  const cardsHtml=selected.map(entry=>_karteExportCardHtml(entry,dispId,idLabel)).join('');
-  const queue=_karteExportQueue(selected);
-  // script終了タグによるHTML破壊を避けるため "<" をUnicodeエスケープしてJSリテラルへ埋め込む
-  const queueJson=JSON.stringify(queue).replace(/</g,'\\u003c');
-  const firstSeq=selected[0]?.seq||'';
-  const lastSeq=selected[selected.length-1]?.seq||'';
+  const cardsHtml=selected.map(entry=>_karteCardHtml(entry,dispId,idLabel,true)).join('');
+  // 対象の連番表記：連続なら「No.a〜No.b」、飛び飛びなら列挙
+  const seqs=selected.map(e=>e.seq);
+  const contiguous=seqs.every((v,i)=>i===0||v===seqs[i-1]+1);
+  const seqText=!seqs.length?'':contiguous?`No.${seqs[0]}〜No.${seqs[seqs.length-1]}`:`No.${seqs.join(', ')}`;
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -5737,56 +5703,29 @@ const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>カルテ転記 ${h(farm.name||'')} ${h(date||'')}</title>
 <style>
-  :root{--navy:#1e3a5f;--navy-2:#274870;--text-1:#1a1a1a;--text-2:#444;--text-3:#777;--text-4:#aaa;--border:#ddd;--border-2:#e5e5e5;--bg:#f4f6f8;--card-bg:#fff;--primary:#2563eb}
+  :root{--navy:#1a3a5c;--navy-2:#0d2137}
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Hiragino Sans,Meiryo,sans-serif;background:var(--bg);color:var(--text-1);padding:16px}
-  .kx-hdbar{max-width:820px;margin:0 auto 16px}
-  .kx-title{font-size:18px;font-weight:800;color:var(--navy)}
-  .kx-sub{font-size:13px;color:var(--text-3);margin-top:2px}
-  .kx-toolbar{max-width:820px;margin:0 auto 16px;position:sticky;top:8px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-  .kx-nextbtn{font-size:15px;font-weight:700;padding:10px 22px;border:none;border-radius:8px;background:var(--primary);color:#fff;cursor:pointer}
-  .kx-nextbtn:disabled{background:#aab5c4;cursor:default}
-  .kx-resetbtn{font-size:12px;padding:7px 12px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--text-2);cursor:pointer}
-  .kx-status{font-size:13px;color:var(--text-2);font-weight:600}
-  .kx-card{max-width:820px;margin:0 auto 14px;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
-  .kx-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--border-2);margin-bottom:8px}
-  .kx-no{background:#e8f0fe;color:var(--navy-2);font-weight:800;border-radius:14px;padding:2px 10px;font-size:13px}
-  .kx-tag{font-size:14px}
-  .tag-pre{color:var(--text-3);font-size:13px}
-  .tag-exp{color:var(--navy-2);font-weight:800;font-size:15px;letter-spacing:1px}
-  .tag-cd{color:var(--text-4);font-size:12px}
-  .kx-idlabel{font-size:12px;color:var(--text-3)}
-  .kx-idval{font-weight:800;color:var(--navy-2);background:#eef2f7;border-radius:6px;padding:1px 8px;font-size:14px}
-  .kx-round{font-size:12px;font-weight:800;border-radius:12px;padding:2px 9px}
-  .kx-round-first{background:#fee2e2;color:#b91c1c}
-  .kx-round-follow{background:#dbeafe;color:#1d4ed8}
-  .kx-row-sep{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-2)}
-  .kx-kind{font-size:12px;font-weight:800;color:var(--navy-2);margin-bottom:4px}
-  .kx-field{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border-2)}
-  .kx-label{font-size:12px;color:var(--text-3);min-width:96px;flex-shrink:0}
-  .kx-value{flex:1;font-size:13px;color:var(--text-1);word-break:break-all}
-  .kx-value.kx-empty{color:var(--text-4)}
-  .kx-copybtn{font-size:13px;padding:3px 9px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer}
-  .kx-copybtn:active{background:#eef2f7}
-  .kx-footer{max-width:820px;margin:20px auto 0;font-size:11px;color:var(--text-4);text-align:center}
+  body{margin:0;font-family:'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;background:#f0f2f5;color:#0f172a;padding:16px}
+  .kx-hdbar{max-width:860px;margin:0 auto 16px;background:var(--navy-2);color:#fff;border-radius:12px;padding:14px 18px}
+  .kx-title{font-size:18px;font-weight:800}
+  .kx-sub{font-size:13px;color:#cbd5e1;margin-top:4px}
+  .kx-sub b{color:#fff}
+  .kx-main{max-width:860px;margin:0 auto}
+  .tag-exp{font-weight:800;font-size:15px;padding:1px 4px;border-radius:4px;letter-spacing:1px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
+  .kx-footer{max-width:860px;margin:20px auto 0;font-size:11px;color:#94a3b8;text-align:center}
+${KARTE_CARD_CSS}
 </style>
 </head>
 <body>
   <div class="kx-hdbar">
     <div class="kx-title">カルテ転記（担当分書き出し）</div>
-    <div class="kx-sub">${h(farm.name||'')}　検査日：${h(fmtDate(date))}　連番 No.${firstSeq}〜No.${lastSeq}</div>
+    <div class="kx-sub">${h(farm.name||'')}　検査日：<b>${h(fmtDate(date))}</b>　対象：<b>${h(seqText)}</b>（${seqs.length}頭）　📋で項目をコピーできます</div>
   </div>
-  <div class="kx-toolbar">
-    <button class="kx-nextbtn" id="kx-nextbtn" onclick="kxNextCopy()">次をコピー ▶</button>
-    <button class="kx-resetbtn" onclick="kxResetSeq()">↺ 先頭に戻る</button>
-    <div class="kx-status" id="kx-status"></div>
-  </div>
-  ${cardsHtml}
+  <div class="kx-main">${cardsHtml}</div>
   <div class="kx-footer">このファイルはオフラインで動作します（アプリ本体・ネットワーク接続は不要です）</div>
 <script>
 (function(){
-  var QUEUE = ${queueJson};
-  var idx = 0;
   function copyText(text, done){
     try{
       if(navigator.clipboard && navigator.clipboard.writeText){
@@ -5804,23 +5743,6 @@ const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
       if(done)done();
     }catch(e){}
   }
-  function updateStatus(){
-    var btn=document.getElementById('kx-nextbtn');
-    var st=document.getElementById('kx-status');
-    if(!QUEUE.length){ st.textContent='対象データがありません'; btn.disabled=true; return; }
-    if(idx>=QUEUE.length){ st.textContent='完了'; btn.disabled=true; return; }
-    var cur=QUEUE[idx];
-    st.textContent='現在：No.'+cur.seq+' / '+cur.kindLabel+' / '+cur.fieldLabel+'　（'+(idx+1)+'/'+QUEUE.length+'）';
-    btn.disabled=false;
-  }
-  window.kxNextCopy=function(){
-    if(idx>=QUEUE.length)return;
-    var item=QUEUE[idx];
-    idx++;
-    copyText(item.value);
-    updateStatus();
-  };
-  window.kxResetSeq=function(){ idx=0; updateStatus(); };
   window.kxCopyClick=function(btnEl){
     var v = btnEl && btnEl.dataset ? btnEl.dataset.copy : '';
     var orig = btnEl ? btnEl.textContent : '';
@@ -5828,7 +5750,6 @@ const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
       if(btnEl){ btnEl.textContent='✓'; setTimeout(function(){ btnEl.textContent=orig; },900); }
     });
   };
-  updateStatus();
 })();
 <\/script>
 </body>
@@ -5861,21 +5782,28 @@ const renderKarte=()=>{
         ${dates.map(d=>`<option value="${d}"${d===KV.date?' selected':''}>${fmtDate(d)}（${realScans.filter(s=>s.scanDate===d).length}頭）</option>`).join('')}
       </select>
     </div>
-    <div class="card">
-      <div class="card-body" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="font-size:13px;font-weight:700;color:var(--text-2)">担当分を書き出し</div>
-        <label style="font-size:12px;color:var(--text-3)">連番</label>
-        <input type="number" class="form-input" id="karte-exp-from" value="1" min="1" max="${numbered.length}" style="width:70px">
-        <span style="color:var(--text-3)">〜</span>
-        <input type="number" class="form-input" id="karte-exp-to" value="${numbered.length}" min="1" max="${numbered.length}" style="width:70px">
-        <button class="btn-sm btn-outline" onclick="App.karteExport()">📄 範囲をHTML書き出し</button>
-        <div style="width:100%;height:0"></div>
-        <label style="font-size:12px;color:var(--text-3)">チェックした個体</label>
-        <span id="karte-pick-count" style="font-size:13px;font-weight:700;color:var(--text-1)">${numbered.filter(e=>KV.pick.has(e.scan.id)).length}頭</span>
-        <button class="btn-sm btn-outline" onclick="App.karteExportPicked()">📄 チェック分をHTML書き出し</button>
-        <button class="btn-sm btn-ghost" onclick="App.kartePickClear()">チェックを全解除</button>
-        <div style="font-size:11px;color:var(--text-4);width:100%">連番の範囲指定、または各個体の「書き出し」チェックで選んだ個体を、オフラインで転記できる単一HTMLファイルとして書き出します（スキップ設定は反映されません）</div>
+    <div class="card kx-panel">
+      <div class="kx-panel-hd">📄 担当分をHTMLで書き出し<span>他の人に転記してもらう個体を選んで、オフラインで使えるHTMLファイルにします</span></div>
+      <div class="kx-panel-row">
+        <div class="kx-panel-lbl">連番で選ぶ</div>
+        <div class="kx-panel-ctl">
+          <span style="font-size:13px;color:var(--text-2)">No.</span>
+          <input type="number" class="form-input" id="karte-exp-from" value="1" min="1" max="${numbered.length}" style="width:76px">
+          <span style="color:var(--text-3)">〜</span>
+          <input type="number" class="form-input" id="karte-exp-to" value="${numbered.length}" min="1" max="${numbered.length}" style="width:76px">
+        </div>
+        <button class="btn-primary kx-panel-btn" onclick="App.karteExport()">⬇ この範囲を書き出し</button>
       </div>
+      <div class="kx-panel-row">
+        <div class="kx-panel-lbl">チェックで選ぶ</div>
+        <div class="kx-panel-ctl">
+          <span style="font-size:13px;color:var(--text-2)">チェック中</span>
+          <span id="karte-pick-count" class="kx-panel-count">${numbered.filter(e=>KV.pick.has(e.scan.id)).length}頭</span>
+          <button class="btn-sm btn-ghost" onclick="App.kartePickClear()">チェックを全解除</button>
+        </div>
+        <button class="btn-primary kx-panel-btn" onclick="App.karteExportPicked()">⬇ チェック分を書き出し</button>
+      </div>
+      <div class="kx-panel-note">※ 各個体カード左端の □ でチェックできます。スキップ設定は書き出しに反映されません。</div>
     </div>
     ${numbered.map(entry=>_karteCardHtml(entry,dispId,idLabel)).join('')}
     `}
