@@ -3504,8 +3504,8 @@ const renderExamMemo=()=>{
           <button class="btn-outline" style="font-size:12px;padding:3px 10px" onclick="App.onMemoDate('${d}');window.scrollTo(0,0)">編集</button>
         </div>
         <div style="display:flex;gap:0">
-          <div style="flex:1;padding:10px 14px;font-size:13px;color:${notes[d]?'var(--text-2)':'#94a3b8'};white-space:pre-wrap;line-height:1.6;max-height:130px;overflow:hidden;position:relative">
-            ${notes[d]?h(notes[d]):'（メモなし）'}
+          <div style="flex:1;padding:10px 14px;font-size:13px;color:${notes[d]?'var(--text-2)':'#94a3b8'};line-height:1.6;max-height:130px;overflow:hidden;position:relative">
+            <div style="white-space:pre-wrap">${notes[d]?h(notes[d]):'（メモなし）'}</div>
             ${notes[d]?`<div style="position:absolute;bottom:0;left:0;right:0;height:32px;background:linear-gradient(transparent,#fff)"></div>`:''}
           </div>
           <div style="flex:0 0 auto;padding:12px 14px;border-left:1px solid var(--border-2);background:#fafbfc;display:flex;align-items:center">
