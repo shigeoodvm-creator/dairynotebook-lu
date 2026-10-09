@@ -5648,12 +5648,26 @@ const _karteFieldHtml=(label,value,displayValue=value,copyFn='App.karteCopyClick
     <span class="kc-copy">${has?`<button class="kc-copybtn" data-copy="${h(value)}" onclick="${copyFn}(this)">📋</button>`:''}</span>
   </div>`;
 };
-const _karteRowHtml=(row,idx,copyFn)=>{
-  const kindLabel=KARTE_KIND_LABEL[row.kind]||row.kind;
-  return `<div${idx>0?' class="kc-kind-sep"':''}>
-    <div class="kc-kind">${h(kindLabel)}</div>
-    <div class="kc-rows">${KARTE_FIELDS.map(fd=>_karteFieldHtml(fd.label,row[fd.key],_karteCodeDisplay(row,fd),copyFn)).join('')}</div>
+const _karteSectionHtml=(title,fieldsHtml,idx)=>`<div${idx>0?' class="kc-kind-sep"':''}>
+    <div class="kc-kind">${h(title)}</div>
+    <div class="kc-rows">${fieldsHtml}</div>
   </div>`;
+// 行為ごとの行を「共通（日付・体温・所見）／種別ひとまとめ／薬品ひとまとめ」に組み替えて表示
+const _karteGroupedHtml=(rows,copyFn)=>{
+  const fd=key=>KARTE_FIELDS.find(f=>f.key===key);
+  const field=(row,key,label=fd(key).label)=>_karteFieldHtml(label,row?.[key],row?_karteCodeDisplay(row,fd(key)):'',copyFn);
+  const echo=rows.find(r=>r.kind==='echo')||rows[0];
+  const procRows=rows.filter(r=>r.procCode!==''&&r.procCode!=null);
+  const drugRows=rows.filter(r=>r.kind==='drug');
+  const num=(i,n)=>n>1?`(${i+1})`:'';
+  const common=field(echo,'date')+field(echo,'temp')+field(echo,'findings');
+  const procs=procRows.length
+    ?procRows.map((r,i)=>field(r,'procCode',fd('procCode').label+num(i,procRows.length))).join('')
+    :field(null,'procCode');
+  const drugs=drugRows.length
+    ?drugRows.map((r,i)=>field(r,'drugCode',fd('drugCode').label+num(i,drugRows.length))+field(r,'qty',fd('qty').label+num(i,drugRows.length))).join('')
+    :field(null,'drugCode')+field(null,'qty');
+  return _karteSectionHtml('共通',common,0)+_karteSectionHtml('種別',procs,1)+_karteSectionHtml('薬品',drugs,2);
 };
 const _karteRoundInfo=(scan)=>{
   const fid=DB.activeId();
@@ -5684,7 +5698,7 @@ const _karteCardHtml=(entry,dispId,idLabel,forExport=false)=>{
       </div>`}
     </div>
     <div class="kc-body">
-      ${rows.map((r,i)=>_karteRowHtml(r,i,forExport?'kxCopyClick':'App.karteCopyClick')).join('')}
+      ${_karteGroupedHtml(rows,forExport?'kxCopyClick':'App.karteCopyClick')}
     </div>
   </div>`;
 };
