@@ -1217,6 +1217,8 @@ const h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g
 const today = () => new Date().toLocaleDateString('sv-SE');
 const todayCompact = () => { const d=new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; };
 const fmtDate = d => d ? d.replace(/-/g,'/') : '－';
+// ISO日時 → 「M/D HH:MM」（端末のローカル時刻）
+const fmtDateTime = iso => { const d=new Date(iso); if(isNaN(d))return ''; const p=n=>String(n).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const shiftMonths = (baseDateStr, monthsBack) => {
   const d=new Date(baseDateStr||today());
   if(Number.isNaN(d.getTime()))return '';
@@ -4666,10 +4668,11 @@ const renderAnimalRegModal=(animalId=null)=>{
             ${isRealTagId?fmtTagId(animal.tagId):'入力すると拡大4桁がプレビューされます'}
           </div>
           <div class="form-hint" style="margin-top:4px">任意入力です。変更すると関連スキャン記録も更新されます。</div>
-          `:`<div class="tag-preview-wrap">${fmtTagId(animal.tagId)}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:6px">
-            拡大4桁：<span class="tag-exp" style="font-size:14px">${get拡4(animal.tagId)}</span>
-          </div>`}
+          `:`<input class="form-input" id="af-tag" value="${h(animal.tagId)}"
+            oninput="App.onTagInput(this)" placeholder="例：1234567890" maxlength="10" required
+            style="font-family:'Courier New',monospace;font-size:16px;letter-spacing:2px;max-width:220px">
+          <div class="tag-preview-wrap" id="af-preview" style="margin-top:6px">${fmtTagId(animal.tagId)}</div>
+          <div class="form-hint" style="margin-top:4px">入力ミスの修正に使えます。変更すると、この個体の検査記録すべての番号も書き換わります。</div>`}
         </div>`:`
         ${isCustomId?`<div class="form-group" style="margin-bottom:14px">
           <label class="form-label">農場管理ID<span class="req">*</span></label>
@@ -5578,7 +5581,7 @@ const renderKarteMaster=renderSettings;
 
 // ─── KARTE 転記ビュー（連番・スキップ・順送りコピー） ───────
 // KV: ビュー内一時状態。date=選択中の検査日／skip=除外scanIdのSet／pick=書き出し対象scanIdのSet
-let KV={date:null,skip:new Set(),pick:new Set()};
+let KV={date:null,skip:new Set(),pick:new Set(),showDone:false};
 const KARTE_KIND_LABEL={echo:'超音波検査',culture:'細菌培養',pcr:'PCR検査',drug:'投薬'};
 const KARTE_FIELDS=[
   {key:'date',label:'①日付'},
@@ -5623,6 +5626,8 @@ const KARTE_CARD_CSS=`
 .kc-round.follow{background:#dbeafe;color:#1e40af}
 .kc-round.unknown{background:#e5e7eb;color:#374151}
 .kc-hd-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.kc.kc-done .kc-hd{background:#64748b}
+.kc-donebadge{background:#dcfce7;color:#166534;font-size:12px;font-weight:700;border-radius:12px;padding:3px 10px;white-space:nowrap}
 .kc-skipbtn{background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;border-radius:6px;font-size:12px;padding:4px 10px;cursor:pointer}
 .kc-skipbtn.on{background:#fff;color:var(--navy-2);font-weight:700}
 .kc-body{padding:12px 16px 14px}
@@ -5683,8 +5688,9 @@ const _karteCardHtml=(entry,dispId,idLabel,forExport=false)=>{
   const tag=scan.tagId||'';
   const roundInfo=_karteRoundInfo(scan);
   const picked=!forExport&&KV.pick.has(scan.id);
+  const done=!forExport&&!!scan.karteExportedAt;
   const roundCls=roundInfo.cls==='b-gray'?'unknown':(roundInfo.first?'first':'follow');
-  return `<div class="kc${picked?' kc-picked':''}${skipped?' kc-skipped':''}" id="kc-${scan.id}">
+  return `<div class="kc${picked?' kc-picked':''}${skipped?' kc-skipped':''}${done?' kc-done':''}" id="kc-${scan.id}">
     <div class="kc-hd">
       ${forExport?'':`<label class="kc-pick" title="書き出し対象にする"><input type="checkbox"${picked?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)"></label>`}
       <span class="kc-no">No.${seq}</span>
@@ -5693,6 +5699,8 @@ const _karteCardHtml=(entry,dispId,idLabel,forExport=false)=>{
       <span class="kc-id">${h(dispId(tag))}</span>
       <span class="kc-round ${roundCls}">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
       ${forExport?'':`<div class="kc-hd-right">
+        ${done?`<span class="kc-donebadge" title="${h(fmtDateTime(scan.karteExportedAt))}に書き出し">📤 書き出し済 ${h(fmtDateTime(scan.karteExportedAt))}</span>
+        <button class="kc-skipbtn" onclick="App.karteUnmarkDone('${scan.id}')" title="チェックリストに戻します">未書き出しに戻す</button>`:''}
         ${skipped?'<span class="badge b-amber">⏭️ 別形態で記録</span>':''}
         <button class="kc-skipbtn${skipped?' on':''}" onclick="App.karteToggleSkip('${scan.id}')">${skipped?'スキップ解除':'スキップ'}</button>
       </div>`}
@@ -5783,6 +5791,8 @@ const renderKarte=()=>{
   // 固定連番：scanDate→createdAt 昇順の安定ソートで No.1..N を付与（スキップしても振り直さない）
   const sorted=dayScans.slice().sort((a,b)=>(a.scanDate||'').localeCompare(b.scanDate||'')||(a.createdAt||'').localeCompare(b.createdAt||''));
   const numbered=sorted.map((s,i)=>({seq:i+1,scan:s}));
+  const doneCount=numbered.filter(e=>e.scan.karteExportedAt).length;
+  const shown=KV.showDone?numbered:numbered.filter(e=>!e.scan.karteExportedAt);
   setView(`
   <div class="page-hd">
     <div class="page-title">カルテ転記</div>
@@ -5813,13 +5823,21 @@ const renderKarte=()=>{
         <div class="kx-panel-ctl">
           <span style="font-size:13px;color:var(--text-2)">チェック中</span>
           <span id="karte-pick-count" class="kx-panel-count">${numbered.filter(e=>KV.pick.has(e.scan.id)).length}頭</span>
+          <button class="btn-sm btn-ghost" onclick="App.kartePickUndone()">未書き出しを全てチェック</button>
           <button class="btn-sm btn-ghost" onclick="App.kartePickClear()">チェックを全解除</button>
         </div>
         <button class="btn-primary kx-panel-btn" onclick="App.karteExportPicked()">⬇ チェック分を書き出し</button>
       </div>
-      <div class="kx-panel-note">※ 各個体カード左端の □ でチェックできます。スキップ設定は書き出しに反映されません。</div>
+      <div class="kx-panel-row" style="background:#f8fafc">
+        <div class="kx-panel-lbl">書き出し状況</div>
+        <div class="kx-panel-ctl">
+          <span style="font-size:13px;color:var(--text-2)">未書き出し <b style="font-size:15px;color:var(--navy-2)">${numbered.length-doneCount}頭</b>　／　書き出し済 <b style="font-size:15px;color:#166534">${doneCount}頭</b>${doneCount&&!KV.showDone?'（一覧から除外中）':''}</span>
+          ${doneCount?`<button class="btn-sm btn-ghost" onclick="App.karteToggleShowDone()">${KV.showDone?'書き出し済を隠す':'書き出し済も表示'}</button>`:''}
+        </div>
+      </div>
+      <div class="kx-panel-note">※ 各個体カード左端の □ でチェックできます。書き出した個体は「書き出し済」になり、一覧から外れます。スキップ設定は書き出しに反映されません。</div>
     </div>
-    ${numbered.map(entry=>_karteCardHtml(entry,dispId,idLabel)).join('')}
+    ${shown.length?shown.map(entry=>_karteCardHtml(entry,dispId,idLabel)).join(''):`<div class="callout cl-blue"><div class="callout-i">✅</div><div>この検査日の個体はすべて書き出し済みです。</div></div>`}
     `}
   </div>
   `);
@@ -5858,6 +5876,24 @@ const App={
     const el=$('karte-pick-count');if(el)el.textContent=`${this._karteNumbered().filter(e=>KV.pick.has(e.scan.id)).length}頭`;
   },
   kartePickClear(){KV.pick=new Set();renderKarte();},
+  kartePickUndone(){
+    KV.pick=new Set(this._karteNumbered().filter(e=>!e.scan.karteExportedAt).map(e=>e.scan.id));
+    renderKarte();
+  },
+  karteToggleShowDone(){KV.showDone=!KV.showDone;renderKarte();},
+  karteUnmarkDone(scanId){
+    const fid=DB.activeId();if(!fid)return;
+    const scans=DB.getScans(fid);const s=scans.find(x=>x.id===scanId);if(!s)return;
+    delete s.karteExportedAt;DB.saveScans(fid,scans);renderKarte();
+  },
+  // 書き出した記録に書き出し日時を記録（データファイルにも保存される）
+  _karteMarkDone(ids){
+    const fid=DB.activeId();if(!fid)return;
+    const now=new Date().toISOString();const set=new Set(ids);
+    const scans=DB.getScans(fid);
+    scans.forEach(s=>{if(set.has(s.id))s.karteExportedAt=now;});
+    DB.saveScans(fid,scans);
+  },
   karteToggleSkip(scanId){
     if(KV.skip.has(scanId))KV.skip.delete(scanId);else KV.skip.add(scanId);
     renderKarte();
@@ -5904,7 +5940,10 @@ const App={
     a.click();
     document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),1000);
-    toast('HTMLファイルを書き出しました','ok');
+    this._karteMarkDone(selected.map(e=>e.scan.id));
+    KV.pick=new Set();
+    renderKarte();
+    toast(`HTMLファイルを書き出しました（${selected.length}頭を書き出し済にしました）`,'ok');
   },
   karteCopyClick(btnEl){
     const v=btnEl?.dataset?.copy||'';
@@ -5990,14 +6029,16 @@ const App={
         if(!localId){toast('農場管理IDを入力してください','err');return;}
         if(animals.some(x=>x.id!==animalId&&x.localId===localId)){toast('この管理IDはすでに使用されています','err');return;}
         a.localId=localId;
-        const newTagRaw=($('af-tag')?.value||'').replace(/\D/g,'');
-        if(newTagRaw.length===10&&newTagRaw!==a.tagId){
-          if(animals.some(x=>x.id!==animalId&&x.tagId===newTagRaw)){toast('この個体識別番号はすでに登録されています','err');return;}
-          a.tagId=newTagRaw;
-          const scans=DB.getScans(fid);
-          scans.filter(s=>s.animalId===animalId).forEach(s=>s.tagId=newTagRaw);
-          DB.saveScans(fid,scans);
-        }
+      }
+      const newTagRaw=($('af-tag')?.value||'').replace(/\D/g,'');
+      if(!isCustomId&&newTagRaw.length!==10){toast('個体識別番号は10桁で入力してください','err');return;}
+      if(newTagRaw.length===10&&newTagRaw!==a.tagId){
+        if(animals.some(x=>x.id!==animalId&&x.tagId===newTagRaw)){toast('この個体識別番号はすでに登録されています','err');return;}
+        if(!isCustomId&&!confirm(`個体識別番号を変更します。\n${a.tagId} → ${newTagRaw}\nこの個体の検査記録もすべて新しい番号に書き換わります。よろしいですか？`))return;
+        a.tagId=newTagRaw;
+        const scans=DB.getScans(fid);
+        scans.filter(s=>s.animalId===animalId).forEach(s=>s.tagId=newTagRaw);
+        DB.saveScans(fid,scans);
       }
       DB.saveAnimals(fid,animals);
       const prev=HutchUtil.lastHutchFromScans(fid,animalId);
@@ -6969,7 +7010,13 @@ const App={
     const _drugItems=(!presentOnly&&treatType?(SS.drugItems||[]):[]).filter(it=>it.drugId).map(it=>({drugId:it.drugId, procId:it.procId||'p_im', qty:(it.qty||'').toString().trim()}));
     const _drugItemNames=_drugItems.map(it=>{const d=Masters.drugs().find(x=>x.id===it.drugId);return d?d.name:'';}).filter(Boolean).join('、');
     const scan={farmId:fid,animalId:animal.id,tagId,scanDate,ageAtScan,round,chestGirth,...(presentOnly?{presentOnly:true,right:{},left:{},obScore:null,mainFindings:'',treated:false,treatType:'',drug:'',notes:$('f-notes').value.trim()}:{right:{...SS.right},left:{...SS.left},obScore:score,mainFindings:$('f-findings').value.trim(),treated:!!treatType,treatType,...(firstDiagDate?{firstDiagDate}:{}),drug:_drugItemNames,bodyTemp:_bodyTemp,procedures:{swab:!!$('f-swab')?.checked},drugItems:_drugItems,notes:$('f-notes').value.trim()}),...(hutchId?{hutchId}:{}),...(hutchFree&&!hutchId?{hutchFree}:{})};
-    if(SS.editId){scan.id=SS.editId;DB.updateScan(fid,scan);toast('記録を更新しました','ok');}
+    if(SS.editId){
+      scan.id=SS.editId;
+      const prevScan=DB.getScans(fid).find(x=>x.id===SS.editId);
+      if(prevScan?.createdAt)scan.createdAt=prevScan.createdAt;
+      if(prevScan?.karteExportedAt)scan.karteExportedAt=prevScan.karteExportedAt;
+      DB.updateScan(fid,scan);toast('記録を更新しました','ok');
+    }
     else{DB.addScan(fid,scan);toast(presentOnly?`${tagId} の在舎記録を保存しました`:`${tagId} のスキャンを保存しました（スコア ${score}）`,'ok');}
     // ハッチが指定されている場合、同個体の同日以降のスキャンに反映
     if(hutchId||hutchFree){

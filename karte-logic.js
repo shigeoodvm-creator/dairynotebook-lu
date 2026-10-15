@@ -36,19 +36,41 @@
 
   const SEVERITY = { P: 8, E: 7, D: 6, C: 5, S: 4, H: 3, B: 2, L: 1, A: 0, '': -1 };
 
+  // 同一所見の部位リストを簡潔な表記にまとめる
+  //   片側全域 → 「右肺全域」、両側全域 → 「両肺全域」
+  //   前葉の前部・後部が両方 → 「右前葉（前部・後部）」
+  function _lobeGroupText(keys) {
+    const has = k => keys.indexOf(k) >= 0;
+    const sideText = (sideName, front, back, others) => {
+      const all = [front, back].concat(others.map(o => o[0]));
+      if (all.every(has)) return [sideName + '肺全域'];
+      const parts = [];
+      if (has(front) && has(back)) parts.push(sideName + '前葉（前部・後部）');
+      else if (has(front)) parts.push(sideName + '前葉前部');
+      else if (has(back)) parts.push(sideName + '前葉後部');
+      others.forEach(([k, label]) => { if (has(k)) parts.push(label); });
+      return parts;
+    };
+    const right = sideText('右', 'rf_a', 'rf_p', [['r_m', '右中葉'], ['r_c', '右後葉']]);
+    const left = sideText('左', 'lf_a', 'lf_p', [['l_c', '左後葉']]);
+    if (right[0] === '右肺全域' && left[0] === '左肺全域') return '両肺全域';
+    return right.concat(left).join('・');
+  }
+
   function buildFindingsText(scan) {
     const score = (scan && scan.obScore != null) ? scan.obScore : '';
     const prefix = '肺エコースコア' + score + '。';
-    const abn = [];
-    LOBE_DEFS.forEach(([side, key, label], idx) => {
+    // 所見コードごとに部位をまとめる（重症度の高い所見から記載）
+    const groups = {};
+    LOBE_DEFS.forEach(([side, key]) => {
       const code = (scan && scan[side] && scan[side][key]) || '';
-      if (code && code !== 'A') {
-        abn.push({ label, code, sev: SEVERITY[code] != null ? SEVERITY[code] : 0, idx });
-      }
+      if (code && code !== 'A') (groups[code] = groups[code] || []).push(key);
     });
-    if (!abn.length) return prefix + '明らかな異常所見なし。';
-    abn.sort((a, b) => (b.sev - a.sev) || (a.idx - b.idx));
-    const body = abn.map(a => a.label + 'に' + (FINDING_LABELS[a.code] || a.code)).join('、');
+    const codes = Object.keys(groups);
+    if (!codes.length) return prefix + '明らかな異常所見なし。';
+    const sev = c => (SEVERITY[c] != null ? SEVERITY[c] : 0);
+    codes.sort((a, b) => sev(b) - sev(a));
+    const body = codes.map(c => _lobeGroupText(groups[c]) + 'に' + (FINDING_LABELS[c] || c)).join('、');
     return prefix + body + 'を認める。';
   }
 
