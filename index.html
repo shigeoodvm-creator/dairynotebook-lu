@@ -7175,8 +7175,23 @@ const App={
       ...LOBES.map(l=>l[2]),
       ...LOBES.map(l=>'コード_'+l[2]),
       'OBスコア','主な所見','治療区分','初診日','薬剤','備考','記録作成日時',
-      '転帰','売却日','売却体重(kg)','売却価格(円)','売却種別','売却備考','死亡日','死亡備考'
+      '転帰','売却日','売却体重(kg)','売却価格(円)','売却種別','売却備考','死亡日','死亡備考',
+      'スワブ実施日','スワブ検出病原体'
     ];
+    // スワブ対応付け：検査日と同日の記録を優先。スキャン時に「鼻腔スワブ」チェックありで同日記録が無ければ±7日で最も近い記録
+    const swabFor=(s,an)=>{
+      const hist=an.swabHistory||[];
+      const flag=!!s.procedures?.swab;
+      let m=hist.filter(r=>r.date===s.scanDate);
+      if(!m.length&&flag){
+        const t=new Date(s.scanDate).getTime();
+        let best=null,bd=Infinity;
+        for(const r of hist){const d=Math.abs(new Date(r.date).getTime()-t)/86400000;if(d<=7&&d<bd){best=r;bd=d;}}
+        if(best)m=[best];
+      }
+      if(m.length)return [m[0].date,m.map(r=>normalizeSwabPathogens(r.pathogens||[]).join('/')).filter(Boolean).join(' ; ')];
+      return flag?[s.scanDate||'','']:['',''];
+    };
 
     // 所見コードを日本語ラベルに変換（研究データ用）
     const fLbl={'':'','A':'正常','L':'線状Bライン','B':'帯状Bライン(コメット)','S':'小コンソリデーション(<1cm²)','C':'局所コンソリデーション','D':'びまん性コンソリデーション','H':'肝変化','E':'胸水','P':'膿瘍'};
@@ -7245,6 +7260,7 @@ const App={
           an.saleNotes||'',
           an.deathDate||'',
           an.deathNotes||'',
+          ...(real?swabFor(s,an):['','']),
         ];
         rows.push(row.map(esc).join(','));
       }
