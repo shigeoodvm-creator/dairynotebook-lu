@@ -5621,6 +5621,10 @@ const KARTE_CARD_CSS=`
 .kc-tag .tag-exp{color:#fff;background:rgba(255,255,255,.15);font-weight:800}
 .kc-idlbl{font-size:12px;color:#cbd5e1}
 .kc-id{background:#fde68a;color:var(--navy-2);font-weight:800;font-size:17px;letter-spacing:2px;border-radius:6px;padding:1px 10px}
+.kc-breed{font-size:14px;font-weight:800;border-radius:6px;padding:1px 10px;background:#e5e7eb;color:#374151}
+.kc-breed-hol{background:#e0f2fe;color:#075985}
+.kc-breed-wagyu{background:#fecaca;color:#7f1d1d}
+.kc-breed-f1{background:#ede9fe;color:#5b21b6}
 .kc-round{font-size:12px;font-weight:700;border-radius:12px;padding:3px 10px}
 .kc-round.first{background:#ef4444;color:#fff}
 .kc-round.follow{background:#dbeafe;color:#1e40af}
@@ -5681,6 +5685,12 @@ const _karteRoundInfo=(scan)=>{
   if(!Number.isFinite(n)||n<1)return {text:'肺エコー回数不明',note:'カルテ要確認',cls:'b-gray',first:false};
   return {text:`肺エコー${n}回目`,note:n===1?'初診カルテ作成':'既存カルテ確認',cls:n===1?'b-red':'b-blue',first:n===1};
 };
+// 書き出しHTML用の品種表示（入力方式が品種で異なるため）：ホル／黒和／F1 など、未登録は「品種不明」
+const _karteBreedChip=(breed)=>{
+  const m=breedMeta(breed);
+  const txt=!m?'品種不明':m.key==='wagyu'?'黒和':m.short;
+  return `<span class="kc-breed kc-breed-${m?m.key:'none'}" title="${h(breed||'')}">${h(txt)}</span>`;
+};
 const _karteCardHtml=(entry,dispId,idLabel,forExport=false)=>{
   const {seq,scan}=entry;
   const skipped=!forExport&&KV.skip.has(scan.id);
@@ -5692,11 +5702,12 @@ const _karteCardHtml=(entry,dispId,idLabel,forExport=false)=>{
   const roundCls=roundInfo.cls==='b-gray'?'unknown':(roundInfo.first?'first':'follow');
   return `<div class="kc${picked?' kc-picked':''}${skipped?' kc-skipped':''}${done?' kc-done':''}" id="kc-${scan.id}">
     <div class="kc-hd">
-      ${forExport?'':`<label class="kc-pick" title="書き出し対象にする"><input type="checkbox"${picked?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)"></label>`}
+      ${forExport?`<label class="kx-ok" title="入力が終わったらチェック"><input type="checkbox" data-kx-id="${scan.id}"><span>入力済</span></label>`:`<label class="kc-pick" title="書き出し対象にする"><input type="checkbox"${picked?' checked':''} onchange="App.kartePickToggle('${scan.id}',this.checked)"></label>`}
       <span class="kc-no">No.${seq}</span>
       <span class="kc-tag">${fmtTagId(tag)}</span>
       <span class="kc-idlbl">${h(idLabel)}</span>
       <span class="kc-id">${h(dispId(tag))}</span>
+      ${forExport?_karteBreedChip(breedOfAnimal(DB.getAnimals(DB.activeId()),scan)):''}
       <span class="kc-round ${roundCls}">${h(roundInfo.text)}：${h(roundInfo.note)}</span>
       ${forExport?'':`<div class="kc-hd-right">
         ${done?`<span class="kc-donebadge" title="${h(fmtDateTime(scan.karteExportedAt))}に書き出し">📤 書き出し済 ${h(fmtDateTime(scan.karteExportedAt))}</span>
@@ -5736,6 +5747,15 @@ const _karteExportDoc=(farm,date,idLabel,dispId,selected)=>{
   .tag-exp{font-weight:800;font-size:15px;padding:1px 4px;border-radius:4px;letter-spacing:1px}
   .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
   .kx-footer{max-width:860px;margin:20px auto 0;font-size:11px;color:#94a3b8;text-align:center}
+  .kx-prog{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:14px}
+  .kx-prog b{font-size:16px;color:#fde68a}
+  .kx-prog label{cursor:pointer;color:#cbd5e1;font-size:13px;display:flex;align-items:center;gap:6px}
+  .kx-ok{display:flex;align-items:center;gap:6px;cursor:pointer;background:#fff;color:var(--navy-2);font-weight:800;font-size:13px;border-radius:14px;padding:3px 12px 3px 8px}
+  .kx-ok input{width:20px;height:20px;cursor:pointer;accent-color:#16a34a}
+  .kc.kc-ok{opacity:.55}
+  .kc.kc-ok .kc-hd{background:#64748b}
+  .kc.kc-ok .kx-ok{background:#dcfce7;color:#166534}
+  .kx-hide-ok .kc.kc-ok{display:none}
 ${KARTE_CARD_CSS}
 </style>
 </head>
@@ -5743,6 +5763,10 @@ ${KARTE_CARD_CSS}
   <div class="kx-hdbar">
     <div class="kx-title">カルテ転記（担当分書き出し）</div>
     <div class="kx-sub">${h(farm.name||'')}　検査日：<b>${h(fmtDate(date))}</b>　対象：<b>${h(seqText)}</b>（${seqs.length}頭）　📋で項目をコピーできます</div>
+    <div class="kx-prog">
+      <span>入力済 <b id="kx-cnt">0</b> / ${seqs.length}頭</span>
+      <label><input type="checkbox" id="kx-hide"> 入力済を隠す</label>
+    </div>
   </div>
   <div class="kx-main">${cardsHtml}</div>
   <div class="kx-footer">このファイルはオフラインで動作します（アプリ本体・ネットワーク接続は不要です）</div>
@@ -5765,6 +5789,31 @@ ${KARTE_CARD_CSS}
       if(done)done();
     }catch(e){}
   }
+  // 入力済チェック（ブラウザに保存。保存できない環境でも動作する）
+  var KEY=${JSON.stringify('kx-ok:'+(farm.id||'')+':'+(date||'')+':'+seqs.join(','))};
+  var saved={};
+  try{ saved=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(e){}
+  var boxes=document.querySelectorAll('input[data-kx-id]');
+  function refresh(){
+    var n=0;
+    for(var i=0;i<boxes.length;i++){
+      var on=boxes[i].checked; if(on)n++;
+      var card=boxes[i].closest('.kc'); if(card) card.classList.toggle('kc-ok',on);
+    }
+    document.getElementById('kx-cnt').textContent=n;
+  }
+  for(var i=0;i<boxes.length;i++){
+    boxes[i].checked=!!saved[boxes[i].getAttribute('data-kx-id')];
+    boxes[i].addEventListener('change',function(){
+      saved[this.getAttribute('data-kx-id')]=this.checked;
+      try{ localStorage.setItem(KEY,JSON.stringify(saved)); }catch(e){}
+      refresh();
+    });
+  }
+  document.getElementById('kx-hide').addEventListener('change',function(){
+    document.body.classList.toggle('kx-hide-ok',this.checked);
+  });
+  refresh();
   window.kxCopyClick=function(btnEl){
     var v = btnEl && btnEl.dataset ? btnEl.dataset.copy : '';
     var orig = btnEl ? btnEl.textContent : '';
