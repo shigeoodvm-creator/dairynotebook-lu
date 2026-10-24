@@ -93,7 +93,7 @@ input,select,textarea{font-family:inherit}
 #farm-btn .caret{font-size:9px;color:var(--text-4);flex-shrink:0}
 
 /* Nav tabs */
-.tb-tabs{display:flex;align-items:stretch;height:54px;gap:0}
+.tb-tabs{display:flex;align-items:stretch;height:54px;gap:0;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
 .tb-tab {
   display:flex;align-items:center;padding:0 11px;font-size:12.5px;font-weight:500;
   color:var(--text-3);border:none;background:none;height:100%;position:relative;
@@ -1045,6 +1045,52 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
 .pm-badge:hover{filter:brightness(0.88)}
 .pm-badge-x{font-size:9px;opacity:0.7;cursor:pointer;line-height:1;padding:0 1px;border-radius:3px}
 .pm-badge-x:hover{opacity:1;background:rgba(0,0,0,0.2)}
+/* ===== 使い方ガイド（DairyNotebook 共通） ===== */
+.howto{--ht-navy:#1a3a5c;--ht-ink:#1f2937;--ht-sub:#4b5563;--ht-line:#e3e6ea;--ht-soft:#f5f7fa;--ht-blue:#2e6fcc;--ht-blue-lt:#e8f0fc;--ht-amber:#92400e;--ht-amber-lt:#fef3c7;--ht-teal:#0f766e;--ht-teal-lt:#e6f6f3;max-width:860px;margin:0 auto;color:var(--ht-ink);font-size:14px;line-height:1.8}
+.howto *{box-sizing:border-box}
+.howto-hero{background:var(--ht-navy);color:#fff;border-radius:12px;padding:22px 24px;margin-bottom:20px}
+.howto-hero h2{margin:0 0 4px;font-size:21px;font-weight:800;color:#fff;letter-spacing:-.2px}
+.howto-hero p{margin:0;font-size:13.5px;opacity:.9}
+.howto-toc{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0;padding:0;list-style:none}
+.howto-toc a{display:inline-block;padding:4px 11px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-size:12px;text-decoration:none}
+.howto-toc a:hover{background:rgba(255,255,255,.26)}
+.howto-sec{background:#fff;border:1px solid var(--ht-line);border-radius:12px;padding:20px 22px;margin-bottom:16px;scroll-margin-top:90px}
+.howto-sec h3{margin:0 0 12px;font-size:17px;font-weight:800;color:var(--ht-navy);display:flex;align-items:center;gap:8px}
+.howto-sec h3 .howto-no{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--ht-navy);color:#fff;font-size:13px;flex:none}
+.howto-sec h4{margin:16px 0 6px;font-size:14.5px;font-weight:700;color:var(--ht-ink)}
+.howto-sec p{margin:0 0 8px}
+.howto-sec ul{margin:0 0 8px;padding-left:1.3em}
+.howto-sec li{margin:2px 0}
+.howto-steps{list-style:none;margin:0;padding:0;counter-reset:htstep}
+.howto-steps>li{position:relative;padding:2px 0 12px 42px;margin:0;counter-increment:htstep}
+.howto-steps>li::before{content:counter(htstep);position:absolute;left:0;top:1px;width:28px;height:28px;border-radius:50%;background:var(--ht-blue-lt);color:var(--ht-blue);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+.howto-steps>li::after{content:"";position:absolute;left:13px;top:32px;bottom:2px;width:2px;background:var(--ht-blue-lt)}
+.howto-steps>li:last-child::after{display:none}
+.howto-steps>li>strong:first-child{display:block;color:var(--ht-ink);font-size:14.5px}
+.howto-steps .howto-ui{white-space:nowrap}
+.howto-ui{display:inline-block;padding:0 7px;border:1px solid #cbd2db;border-bottom-width:2px;border-radius:5px;background:var(--ht-soft);font-size:12.5px;font-weight:700;color:var(--ht-ink);line-height:1.7;margin:0 1px}
+.howto-note{border-radius:10px;padding:12px 14px;margin:10px 0;font-size:13.5px;border-left:4px solid}
+.howto-note ul{margin:4px 0 8px;padding-left:1.3em}.howto-note li{margin:2px 0}.howto-note p:last-child,.howto-note ul:last-child{margin-bottom:0}
+.howto-note-title{font-weight:800;margin-bottom:4px;display:block}
+.howto-note.warn{background:var(--ht-amber-lt);border-color:#d97706;color:#4a2a07}
+.howto-note.warn .howto-note-title{color:var(--ht-amber)}
+.howto-note.tip{background:var(--ht-teal-lt);border-color:#14b8a6;color:#113c37}
+.howto-note.tip .howto-note-title{color:var(--ht-teal)}
+.howto-note.info{background:var(--ht-blue-lt);border-color:var(--ht-blue);color:#132b4d}
+.howto-note.info .howto-note-title{color:var(--ht-blue)}
+.howto-table{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:13.5px}
+.howto-table th,.howto-table td{border:1px solid var(--ht-line);padding:7px 10px;text-align:left;vertical-align:top}
+.howto-table th{background:var(--ht-soft);font-weight:700;white-space:nowrap;width:9.5em}
+.howto-faq details{border:1px solid var(--ht-line);border-radius:8px;padding:0 14px;margin-bottom:8px;background:#fff}
+.howto-faq summary{cursor:pointer;font-weight:700;padding:10px 0;list-style:none}
+.howto-faq summary::-webkit-details-marker{display:none}
+.howto-faq summary::before{content:"Q.";color:var(--ht-blue);margin-right:6px}
+.howto-faq details[open] summary{border-bottom:1px dashed var(--ht-line)}
+.howto-faq details>div{padding:8px 0 10px}
+.howto-foot{font-size:12px;color:var(--ht-sub);text-align:center;margin:18px 0 6px}
+.howto-link{color:var(--ht-blue);font-weight:700;cursor:pointer;text-decoration:underline}
+@media (max-width:640px){.howto-sec{padding:16px 14px}.howto-hero{padding:18px 16px}.howto-table th{width:auto;white-space:normal}}
+@media print{.howto-hero{background:#fff;color:var(--ht-navy);border:2px solid var(--ht-navy)}.howto-hero h2{color:var(--ht-navy)}.howto-toc{display:none}.howto-sec{break-inside:avoid;page-break-inside:avoid}.howto-faq details{break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -1075,6 +1121,7 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
     <button class="tb-tab" data-route="/exam-memo" onclick="App.nav('/exam-memo')">📝 検診日誌</button>
     <button class="tb-tab" data-route="/guide"     onclick="App.nav('/guide')">ガイド・パンフ</button>
     <button class="tb-tab" data-route="/settings"  onclick="App.nav('/settings')">⚙️ 設定</button>
+    <button class="tb-tab" data-route="/howto"     onclick="App.nav('/howto')">📖 使い方ガイド</button>
   </div>
 
   <div class="tb-spacer"></div>
@@ -2201,6 +2248,7 @@ const renderHome=()=>{
          <button class="btn-primary" style="padding:12px 32px;font-size:15px;width:100%;border-radius:10px;margin-bottom:12px" onclick="FileStore.openFile()">📂 保存済みファイルを開く</button>
          <button class="btn-outline" style="padding:12px 32px;font-size:15px;width:100%;border-radius:10px" onclick="App.openFarmModal()">＋ 新しい農場を作成する</button>`
     }
+    <p style="margin-top:18px;font-size:13px">はじめて使う方は <a href="#/howto" style="font-weight:700">📖 使い方ガイド</a> をご覧ください</p>
   </div>`);
 };
 
@@ -3721,6 +3769,132 @@ const renderGuide=()=>{
 
   ${GS.tab==='guide'?guideHtml:pamphletHtml}
   `);
+};
+
+// HOWTO VIEW（使い方ガイド）
+const renderHowto=()=>{
+  const go=id=>`onclick="document.getElementById('${id}').scrollIntoView();return false"`;
+  setView(`
+  <div class="howto">
+    <div class="howto-hero">
+      <h2>📖 使い方ガイド</h2>
+      <p>DairyNotebookLU は、子牛の肺エコー検診の結果を記録し、農場向けのレポートまで作るアプリです。<br>はじめての方は、上から順に「1」〜「4」を読めば使い始められます。</p>
+      <ul class="howto-toc">
+        <li><a href="#" ${go('ht-ready')}>1. 準備</a></li>
+        <li><a href="#" ${go('ht-first')}>2. 最初の設定</a></li>
+        <li><a href="#" ${go('ht-scan')}>3. 検診の記録</a></li>
+        <li><a href="#" ${go('ht-report')}>4. レポート</a></li>
+        <li><a href="#" ${go('ht-save')}>5. データの保存</a></li>
+        <li><a href="#" ${go('ht-tabs')}>6. 各タブの役割</a></li>
+        <li><a href="#" ${go('ht-faq')}>7. 困ったとき</a></li>
+      </ul>
+    </div>
+
+    <section class="howto-sec" id="ht-ready">
+      <h3><span class="howto-no">1</span>準備するもの</h3>
+      <table class="howto-table">
+        <tr><th>パソコン・タブレット</th><td>Google Chrome または Microsoft Edge（最新版）で開いてください。Safari・Firefox ではファイルの自動保存が使えません。</td></tr>
+        <tr><th>アプリ一式</th><td><strong>DairyNotebookLU.html</strong> と、同じフォルダにある <strong>expiry.min.js</strong>・<strong>libs</strong> フォルダを、フォルダごとコピーして使います。HTML ファイルだけを取り出すと動きません。</td></tr>
+        <tr><th>保存先</th><td>記録は JSON ファイル1つにまとめて保存します。OneDrive など、バックアップされる場所に保存することをおすすめします。</td></tr>
+        <tr><th>エコー装置</th><td>検診は CalfScan 7葉方式（右肺4か所・左肺3か所）の評価を前提にしています。判定基準は <a class="howto-link" onclick="App.nav('/guide')">ガイド・パンフ</a> タブで確認できます。</td></tr>
+      </table>
+      <div class="howto-note info"><span class="howto-note-title">はじめて起動したとき</span>
+        「利用コード」の入力画面が出ます。ホームページからメールを登録すると届くコードを貼り付けて <span class="howto-ui">認証</span> を押し、「利用前の確認」に同意すると使い始められます（次回からは不要です）。</div>
+    </section>
+
+    <section class="howto-sec" id="ht-first">
+      <h3><span class="howto-no">2</span>最初の設定（はじめの1回だけ）</h3>
+      <ol class="howto-steps">
+        <li><strong>農場を作成する</strong>
+          最初の画面で <span class="howto-ui">＋ 新しい農場を作成する</span> を押し、農場名を入力して <span class="howto-ui">＋ 農場を作成</span> を押します。
+          <ul>
+            <li><strong>検診パターン</strong>：A 集中型（7日間隔）／B 標準型（14日間隔）／C 簡易型（3点固定）から選びます。迷ったら B のままで構いません。</li>
+            <li><strong>管理IDの種別</strong>：通常は「拡大4桁（個体識別番号10桁のうち6〜9桁目）」。哺育育成センターなど拡大4桁が重複する農場は「農場独自ID」を選びます。</li>
+          </ul>
+        </li>
+        <li><strong>保存ファイルを作る</strong>
+          画面右上の <span class="howto-ui">💾 データ ▾</span> → <span class="howto-ui">💾 名前を付けて保存</span> で、保存場所とファイル名を決めます。以後、入力内容はこのファイルに自動で保存されます。</li>
+        <li><strong>（必要に応じて）ハッチ・群・薬品を登録する</strong>
+          <span class="howto-ui">🏠 ハッチ</span> タブでハッチの配置を登録すると、スコアを配置図で見られます。ハッチを出た後も追跡する場合は <span class="howto-ui">🐄 群</span> タブで群を登録します。治療に使う薬品は <span class="howto-ui">⚙️ 設定</span> タブで登録できます。後からでも設定できます。</li>
+      </ol>
+      <div class="howto-note warn"><span class="howto-note-title">2回目以降の起動</span>
+        このアプリは、起動時に前回のデータを自動では読み込みません。毎回 <span class="howto-ui">📂 保存済みファイルを開く</span> で、手順2で作ったファイルを開いてから作業してください。</div>
+    </section>
+
+    <section class="howto-sec" id="ht-scan">
+      <h3><span class="howto-no">3</span>検診の記録（1頭ずつ入力）</h3>
+      <ol class="howto-steps">
+        <li><strong><span class="howto-ui">＋ スキャン</span> を押す</strong>
+          右上のボタンか、<span class="howto-ui">スキャン入力</span> タブから入力画面を開きます。</li>
+        <li><strong>個体を指定する</strong>
+          拡大4桁（または管理ID）で検索します。登録済みの牛は候補から選べます。初めての牛は耳標番号（10桁）を入力すると新規登録されます（生年月日・品種・性別は任意）。生年月日があれば日齢は自動計算されます。</li>
+        <li><strong>肺エコー所見を入れる</strong>
+          右肺・左肺の各部位のボタンを<strong>タップするたびに所見が切り替わります</strong>（正常 → 線状B → 帯状B → 小コンソリ → 局所C …）。全部位が正常なら <span class="howto-ui">すべて正常に設定</span> が便利です。<strong>スコア（Ollivett-Buczinski）は所見から自動で決まります。</strong></li>
+        <li><strong>必要なら治療・体温・メモを入れる</strong>
+          体温（℃）、使用薬剤、主な所見、次回予定などを記録できます。その日スキャンしなかった牛は「この日はスキャンしない（在舎のみ記録）」にチェックします。</li>
+        <li><strong><span class="howto-ui">✓ 記録を保存する</span></strong>
+          保存すると次の牛を続けて入力できます。入力した記録は <span class="howto-ui">履歴</span> タブで確認・修正できます。</li>
+      </ol>
+      <div class="howto-note tip"><span class="howto-note-title">現場で入力できないとき</span>
+        <span class="howto-ui">野帳</span> タブを印刷すると、記入用の用紙として使えます。検診後にまとめて入力してください。</div>
+    </section>
+
+    <section class="howto-sec" id="ht-report">
+      <h3><span class="howto-no">4</span>レポートを作る</h3>
+      <ol class="howto-steps">
+        <li><strong><span class="howto-ui">📋 レポート</span> タブを開く</strong>
+          入力済みの記録から、農場向けの検診結果レポートが自動で作られます。スコア2以上の個体の一覧や、前回からの変化も表示されます。</li>
+        <li><strong>印刷・PDF保存</strong>
+          <span class="howto-ui">🖨 印刷 / PDF保存</span> を押し、プリンターを選ぶか「PDFに保存」を選びます。</li>
+      </ol>
+      <p>農場への説明用に、<span class="howto-ui">ガイド・パンフ</span> タブの「農場向けパンフ」も印刷して配れます。</p>
+    </section>
+
+    <section class="howto-sec" id="ht-save">
+      <h3><span class="howto-no">5</span>データの保存と引き継ぎ</h3>
+      <ul>
+        <li>データは<strong>お使いの端末の中（保存ファイル）だけ</strong>に保存されます。インターネットへ送信されることはありません。</li>
+        <li>画面右上に保存先のファイル名が表示されていれば、自動保存されています。</li>
+        <li>別のパソコンで続きをするときは、保存ファイル（.json）をコピーして、そのパソコンで <span class="howto-ui">📂 ファイルを開く</span> で開きます。</li>
+        <li><span class="howto-ui">💾 データ ▾</span> メニューから、農場ごとの JSON 書き出し・CSV 書き出し（Excel 用）・JSON 読み込みができます。</li>
+      </ul>
+      <div class="howto-note warn"><span class="howto-note-title">ご注意</span>
+        保存ファイルを指定しないまま閉じると、入力した内容は残りません。作業を始める前に、必ずファイルを開くか「名前を付けて保存」をしてください。</div>
+    </section>
+
+    <section class="howto-sec" id="ht-tabs">
+      <h3><span class="howto-no">6</span>各タブの役割</h3>
+      <table class="howto-table">
+        <tr><th>ダッシュボード</th><td>登録頭数、有病率（スコア2以上）、治療介入率、最近の記録などを一覧します。</td></tr>
+        <tr><th>スキャン入力</th><td>1頭ずつ所見を入力します。</td></tr>
+        <tr><th>📋 レポート</th><td>農場向けの検診結果レポートを作り、印刷します。</td></tr>
+        <tr><th>個体管理</th><td>登録した牛の一覧と、1頭ごとの検診の経過を見られます。</td></tr>
+        <tr><th>履歴</th><td>過去の記録の確認・修正・削除をします。</td></tr>
+        <tr><th>野帳</th><td>現場で手書きするための記入用紙を印刷します。</td></tr>
+        <tr><th>🏠 ハッチ／🐄 群</th><td>ハッチや群の配置図の上に、各個体のスコアを色で表示します。</td></tr>
+        <tr><th>分析</th><td>期間ごとのスコア分布や有病率の推移をグラフで見ます。</td></tr>
+        <tr><th>📝 検診日誌</th><td>検診日ごとの聞き取りや気づきを残すメモです（レポートには出ません）。</td></tr>
+        <tr><th>ガイド・パンフ</th><td>獣医師向けのスコア判定基準と、農場向けパンフレットです。</td></tr>
+        <tr><th>⚙️ 設定</th><td>薬品マスタなど、アプリの設定をします。</td></tr>
+      </table>
+    </section>
+
+    <section class="howto-sec howto-faq" id="ht-faq">
+      <h3><span class="howto-no">7</span>困ったとき</h3>
+      <details><summary>起動したら、前に入力したデータが表示されない</summary>
+        <div>起動時は前回のデータを自動では読み込みません。<span class="howto-ui">💾 データ ▾</span> → <span class="howto-ui">📂 ファイルを開く</span> で保存ファイルを開いてください。</div></details>
+      <details><summary>「アクセスを許可しますか」とブラウザに聞かれる</summary>
+        <div>保存ファイルに書き込むための確認です。「許可する」（または「ファイルを編集」）を選んでください。</div></details>
+      <details><summary>グラフが表示されない／画面が真っ白になる</summary>
+        <div>HTML ファイルだけをコピーしていないか確認してください。<strong>expiry.min.js</strong> と <strong>libs</strong> フォルダが同じ場所に必要です。</div></details>
+      <details><summary>拡大4桁が同じ牛がいて区別できない</summary>
+        <div>農場の管理IDを「農場独自ID」に切り替えてください。画面上部の農場名を押して開く「農場の管理」で切り替えられます。</div></details>
+      <details><summary>乳検の成績も一緒に見たい</summary>
+        <div><span class="howto-ui">💾 データ ▾</span> → <span class="howto-ui">🥛 乳検CSVインポート</span> で、乳検の CSV を個体識別番号で照合して取り込めます。</div></details>
+    </section>
+
+    <p class="howto-foot">このガイドは画面右上の「📖 使い方ガイド」タブからいつでも開けます。</p>
+  </div>`);
 };
 
 // ANIMALS VIEW
@@ -7685,6 +7859,7 @@ const App={
     Router.on('/hatch-map',()=>renderHatchMap());
     Router.on('/pen-map',()=>renderPenMap());
     Router.on('/settings',()=>renderSettings());
+    Router.on('/howto',()=>renderHowto());
     Router.on('/karte-master',()=>renderKarteMaster());
     Router.on('/karte',()=>renderKarte());
     (async ()=>{
