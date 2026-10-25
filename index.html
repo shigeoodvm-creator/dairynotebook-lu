@@ -7876,8 +7876,8 @@ const App={
         : 'このブラウザはフォルダ連携に非対応です。起動時は前回キャッシュを復元しません。「名前を付けて保存」でJSONをダウンロードして作業を開始してください。';
       FileStore._setStatus('📂 まずファイルを指定してください', false, sec);
       updateTopBar();
+      // URLに #/howto などが付いたまま開いた場合も、その画面を表示する（農場未選択の画面はRouter側がホームへ誘導）
       Router.init();
-      renderHome();
     })();
   }
 };
