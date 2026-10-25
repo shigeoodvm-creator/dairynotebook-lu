@@ -100,6 +100,10 @@ input,select,textarea{font-family:inherit}
   transition:var(--tr);white-space:nowrap;
 }
 .tb-tab:hover{color:var(--text)}
+.tb-tab.tb-tab-guide{align-self:center;height:36px;margin:0 12px 0 0;padding:0 16px;border-radius:8px;background:#2e6fcc;color:#fff;font-weight:700;font-size:13px;box-shadow:0 2px 6px rgba(46,111,204,.35);flex:none}
+.tb-tab.tb-tab-guide:hover{background:#1f5bb0;color:#fff}
+.tb-tab.tb-tab-guide.active{background:#1a3a5c;color:#fff}
+.tb-tab.tb-tab-guide.active::after{display:none}
 .tb-tab.active{color:var(--navy);font-weight:700}
 .tb-tab.active::after{
   content:'';position:absolute;bottom:0;left:8px;right:8px;height:2.5px;
@@ -1109,6 +1113,7 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
   </button>
 
   <div class="tb-tabs">
+    <button class="tb-tab tb-tab-guide" data-route="/howto" onclick="App.nav('/howto')">📖 使い方ガイド</button>
     <button class="tb-tab" data-route="/dashboard" onclick="App.nav('/dashboard')">ダッシュボード</button>
     <button class="tb-tab" data-route="/scan/new"  onclick="App.nav('/scan/new')">スキャン入力</button>
     <button class="tb-tab" data-route="/report"    onclick="App.nav('/report')">📋 レポート</button>
@@ -1121,7 +1126,6 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
     <button class="tb-tab" data-route="/exam-memo" onclick="App.nav('/exam-memo')">📝 検診日誌</button>
     <button class="tb-tab" data-route="/guide"     onclick="App.nav('/guide')">ガイド・パンフ</button>
     <button class="tb-tab" data-route="/settings"  onclick="App.nav('/settings')">⚙️ 設定</button>
-    <button class="tb-tab" data-route="/howto"     onclick="App.nav('/howto')">📖 使い方ガイド</button>
   </div>
 
   <div class="tb-spacer"></div>
@@ -2248,7 +2252,7 @@ const renderHome=()=>{
          <button class="btn-primary" style="padding:12px 32px;font-size:15px;width:100%;border-radius:10px;margin-bottom:12px" onclick="FileStore.openFile()">📂 保存済みファイルを開く</button>
          <button class="btn-outline" style="padding:12px 32px;font-size:15px;width:100%;border-radius:10px" onclick="App.openFarmModal()">＋ 新しい農場を作成する</button>`
     }
-    <p style="margin-top:18px;font-size:13px">はじめて使う方は <a href="#/howto" style="font-weight:700">📖 使い方ガイド</a> をご覧ください</p>
+    <a href="#/howto" style="display:block;margin-top:18px;padding:12px 20px;border-radius:10px;background:#2e6fcc;color:#fff;font-weight:700;font-size:15px;text-decoration:none;box-shadow:0 2px 6px rgba(46,111,204,.35)">📖 はじめての方はこちら：使い方ガイド</a>
   </div>`);
 };
 
@@ -3794,7 +3798,7 @@ const renderHowto=()=>{
       <h3><span class="howto-no">1</span>準備するもの</h3>
       <table class="howto-table">
         <tr><th>パソコン・タブレット</th><td>Google Chrome または Microsoft Edge（最新版）で開いてください。Safari・Firefox ではファイルの自動保存が使えません。</td></tr>
-        <tr><th>アプリ一式</th><td><strong>DairyNotebookLU.html</strong> と、同じフォルダにある <strong>expiry.min.js</strong>・<strong>libs</strong> フォルダを、フォルダごとコピーして使います。HTML ファイルだけを取り出すと動きません。</td></tr>
+        <tr><th>アプリの開き方</th><td>インストールは不要です。ホームページで案内されているアドレス（URL）をブラウザで開くだけで使えます。次回すぐ開けるよう、ブックマーク（お気に入り）に登録しておくと便利です。</td></tr>
         <tr><th>保存先</th><td>記録は JSON ファイル1つにまとめて保存します。OneDrive など、バックアップされる場所に保存することをおすすめします。</td></tr>
         <tr><th>エコー装置</th><td>検診は CalfScan 7葉方式（右肺4か所・左肺3か所）の評価を前提にしています。判定基準は <a class="howto-link" onclick="App.nav('/guide')">ガイド・パンフ</a> タブで確認できます。</td></tr>
       </table>
@@ -3885,8 +3889,8 @@ const renderHowto=()=>{
         <div>起動時は前回のデータを自動では読み込みません。<span class="howto-ui">💾 データ ▾</span> → <span class="howto-ui">📂 ファイルを開く</span> で保存ファイルを開いてください。</div></details>
       <details><summary>「アクセスを許可しますか」とブラウザに聞かれる</summary>
         <div>保存ファイルに書き込むための確認です。「許可する」（または「ファイルを編集」）を選んでください。</div></details>
-      <details><summary>グラフが表示されない／画面が真っ白になる</summary>
-        <div>HTML ファイルだけをコピーしていないか確認してください。<strong>expiry.min.js</strong> と <strong>libs</strong> フォルダが同じ場所に必要です。</div></details>
+      <details><summary>画面が真っ白になる・グラフが表示されない</summary>
+        <div>インターネットに接続されているか確認し、ブラウザの更新ボタン（または Ctrl+F5）でページを読み込み直してください。それでも直らないときは、Chrome または Edge の最新版でお試しください。</div></details>
       <details><summary>拡大4桁が同じ牛がいて区別できない</summary>
         <div>農場の管理IDを「農場独自ID」に切り替えてください。画面上部の農場名を押して開く「農場の管理」で切り替えられます。</div></details>
       <details><summary>乳検の成績も一緒に見たい</summary>
