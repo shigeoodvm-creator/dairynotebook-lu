@@ -114,9 +114,24 @@
     return rows;
   }
 
+  // ワクチン接種記録 → カルテ行（所見欄は空、数量＝1頭あたり用量 mL）
+  function buildVaccineRows(recs, vaccines, procMaster) {
+    return (recs || []).map(rec => {
+      const v = (vaccines || []).find(x => x.id === rec.vaccineId);
+      const ml = v && v.doseMl;
+      return {
+        kind: 'vaccine', date: rec.date || '', temp: '', findings: '',
+        procCode: v ? _codeById(procMaster, v.procId) : '',
+        drugCode: (v && v.drugCode) || '',
+        qty: (ml === 0 || ml) ? String(ml) : '',
+        label: v ? v.name + ' ' + rec.doseNo + '回目' : '（削除済みワクチン）',
+      };
+    });
+  }
+
   const KarteLogic = {
     DEFAULT_DRUG_MASTER, DEFAULT_PROC_MASTER, LOBE_DEFS, FINDING_LABELS,
-    buildFindingsText, buildKarteRows,
+    buildFindingsText, buildKarteRows, buildVaccineRows,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = KarteLogic;
