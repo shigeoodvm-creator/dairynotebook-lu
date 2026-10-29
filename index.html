@@ -5934,6 +5934,65 @@ const vaccineCandidates=(fid,date,mode,bdFrom,bdTo)=>{
   });
 };
 const VX_LOCKED=new Set(['complete','doneToday','noBirth']);
+const VACCINE_WITHDRAWAL_DAYS=20; // 通知書に記載する出荷制限（日）
+/** ワクチン接種通知書（農場向け・A4縦1枚）。開くと印刷ダイアログを出し、「PDFに保存」でPDF化する */
+const vaccineNoticeHtml=(farm,vaccine,date,vet,rows)=>{
+  const ml=vaccine.doseMl;
+  const doseTxt=(ml===0||ml)?`${ml} mL／頭`:'－';
+  const totalTxt=(ml===0||ml)?`${Math.round(ml*rows.length*10)/10} mL`:'－';
+  const list=rows.map((r,i)=>({no:i+1,tag:r.a.tagId||'',disp:r.disp}));
+  // 1枚に収めるため、32頭を超えたら2列組みにする
+  const per=list.length>32?Math.ceil(list.length/2):list.length;
+  const cols=per?[list.slice(0,per),list.slice(per)].filter(c=>c.length):[];
+  const tbl=c=>`<table class="vn-tbl"><thead><tr><th>No</th><th>個体識別番号</th><th>ワクチン名</th><th>接種量</th></tr></thead>
+    <tbody>${c.map(r=>`<tr><td>${r.no}</td><td class="vn-tag">${h(r.tag)}${r.disp&&r.disp!==r.tag?`<span>（${h(r.disp)}）</span>`:''}</td><td>${h(vaccine.name)}</td><td>${(ml===0||ml)?h(String(ml))+' mL':'－'}</td></tr>`).join('')}</tbody></table>`;
+  const issued=today();
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
+<title>ワクチン接種通知書_${h(farm.name)}_${h(date)}</title>
+<style>
+@page{size:A4 portrait;margin:14mm 14mm 12mm}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;color:#0f172a;font-size:11.5pt;line-height:1.6;background:#e5e7eb}
+.vn-page{width:210mm;min-height:297mm;margin:10px auto;background:#fff;padding:14mm 14mm 12mm;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.vn-issued{text-align:right;font-size:10.5pt}
+.vn-to{font-size:15pt;font-weight:700;border-bottom:1.5px solid #0f172a;display:inline-block;padding:0 24px 2px 2px;margin:3mm 0 0}
+.vn-title{text-align:center;font-size:20pt;font-weight:800;letter-spacing:.3em;margin:5mm 0 4mm}
+.vn-lead{margin:0 0 3mm}
+.vn-sum{width:100%;border-collapse:collapse;margin:0 0 4mm}
+.vn-sum th,.vn-sum td{border:1px solid #334155;padding:3px 10px;text-align:left}
+.vn-sum th{width:32mm;background:#f1f5f9;font-weight:700}
+.vn-warn{font-weight:800;font-size:12.5pt}
+.vn-cols{display:flex;gap:6mm;align-items:flex-start}
+.vn-tbl{flex:1;border-collapse:collapse;font-size:9pt;line-height:1.2}
+.vn-tbl th,.vn-tbl td{border:1px solid #334155;padding:1.5px 6px;text-align:center}
+.vn-tbl th{background:#f1f5f9}
+.vn-tbl td.vn-tag{font-family:'Courier New',monospace;font-weight:700;text-align:left}
+.vn-tbl td.vn-tag span{font-family:inherit;font-weight:400;color:#475569}
+.vn-sign{margin-top:6mm;text-align:right;font-size:12pt}
+.vn-sign b{display:inline-block;min-width:50mm;border-bottom:1px solid #0f172a;text-align:left;padding:0 4px}
+.vn-bar{text-align:center;margin:12px}
+.vn-bar button{font-size:14px;padding:8px 18px;border-radius:8px;border:none;background:#1a3a5c;color:#fff;cursor:pointer}
+@media print{body{background:#fff}.vn-page{margin:0;box-shadow:none;width:auto;min-height:0;padding:0}.vn-bar{display:none}}
+</style></head><body>
+<div class="vn-bar"><button onclick="window.print()">🖨 印刷・PDFで保存</button>　印刷画面の送信先で「PDFに保存」を選ぶとPDFになります</div>
+<div class="vn-page">
+  <div class="vn-issued">発行日：${h(fmtDate(issued))}</div>
+  <div class="vn-to">${h(farm.name)} 様</div>
+  <div class="vn-title">ワクチン接種通知書</div>
+  <p class="vn-lead">下記のとおりワクチンを接種しましたので、お知らせいたします。</p>
+  <table class="vn-sum">
+    <tr><th>接種日</th><td>${h(fmtDate(date))}</td></tr>
+    <tr><th>ワクチン名</th><td>${h(vaccine.name)}</td></tr>
+    <tr><th>接種量</th><td>${doseTxt}（計 ${totalTxt}）</td></tr>
+    <tr><th>接種頭数</th><td>${rows.length} 頭</td></tr>
+    <tr><th>出荷制限</th><td class="vn-warn">接種日から ${VACCINE_WITHDRAWAL_DAYS} 日間</td></tr>
+  </table>
+  <div class="vn-cols">${cols.map(tbl).join('')}</div>
+  <div class="vn-sign">獣医師　<b>${h(vet)}</b></div>
+</div>
+<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},300);});<\/script>
+</body></html>`;
+};
 const _vaccineRows=(fid,vaccine)=>{
   const animals=vaccineCandidates(fid,VS.date,VS.mode,VS.bdFrom,VS.bdTo);
   const dispId=makeDispId(fid,DB.getAnimals(fid));
@@ -6454,10 +6513,26 @@ const App={
     const rows=_vaccineRows(fid,vaccine).filter(r=>VS.pick.has(r.a.id)&&!VX_LOCKED.has(r.j.status));
     if(!rows.length)return;
     if(!confirm(`${fmtDate(VS.date)}　${vaccine.name} を ${rows.length}頭に登録します。よろしいですか？`))return;
+    // 通知書の獣医師名：野帳の検査者。空欄なら記名を求める（キャンセル時は登録しない）
+    let vet=(NS.examiner||'').trim();
+    if(!vet){
+      const v=prompt('ワクチン接種通知書に記載する獣医師名を入力してください（野帳の「検査者」にも反映されます）','');
+      if(v===null||!v.trim()){toast('獣医師名が未入力のため、登録を中止しました','warn');return;}
+      vet=v.trim();NS.examiner=vet;
+    }
+    // ポップアップブロック回避のため、クリック処理の中で先に通知書ウィンドウを開く
+    const win=window.open('','_blank');
     DB.addVaccinations(fid,rows.map(r=>({animalId:r.a.id,vaccineId:vaccine.id,date:VS.date,doseNo:r.j.doseNo})));
     VS.pick=null;
     toast(`${rows.length}頭の接種を記録しました`,'ok');
     renderVaccine();
+    if(win){
+      win.document.open();
+      win.document.write(vaccineNoticeHtml(farm,vaccine,VS.date,vet,rows));
+      win.document.close();
+    }else{
+      toast('ポップアップがブロックされたため通知書を開けませんでした。ブラウザの設定でこのページのポップアップを許可してください','err',6000);
+    }
   },
 
   // ワクチン設定（農場ごと）
