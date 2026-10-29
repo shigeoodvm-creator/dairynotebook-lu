@@ -414,6 +414,9 @@ tbody td{padding:10px 13px;vertical-align:middle;color:var(--text-2)}
   border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;
 }
 .filter-bar .form-input,.filter-bar .form-select{padding:7px 10px;font-size:13px;width:auto}
+/* 履歴・個体管理：スクロールしても検索バーを上部に固定 */
+.filter-bar.fb-sticky{position:sticky;top:64px;z-index:20;box-shadow:0 4px 10px rgba(13,33,55,.10)}
+@media print{.filter-bar.fb-sticky{position:static;box-shadow:none}}
 .btn-sm{padding:7px 13px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:var(--tr);white-space:nowrap}
 .btn-ghost{background:var(--gray-lt);color:var(--text-3);border:1px solid var(--border-2)}
 .btn-ghost:hover{background:var(--border);color:var(--text)}
@@ -2241,10 +2244,10 @@ const Router={
 const updateTopBar=()=>{const fid=DB.activeId();const farm=fid?DB.getFarm(fid):null;const el=$('tb-farm-name');if(el)el.textContent=farm?farm.name:'農場を選択';renderSideNav();};
 /** 左サイドメニュー。ワクチン接種はその農場でオンのときだけ出す */
 const SIDENAV_GROUPS=[
-  {title:'検診',items:[['/scan/new','スキャン入力'],['/notes','野帳'],['/vaccine','💉 ワクチン接種','vaccine'],['/exam-memo','📝 検診日誌']]},
-  {title:'個体・場所',items:[['/animals','個体管理'],['/history','履歴'],['/hatch-map','🏠 ハッチ'],['/pen-map','🐄 群']]},
-  {title:'集計・出力',items:[['/dashboard','ダッシュボード'],['/report','📋 レポート'],['/analysis','分析'],['/karte','🧾 カルテ転記']]},
-  {title:'その他',items:[['/guide','ガイド・パンフ'],['/settings','⚙️ 設定']]},
+  {title:'検診',items:[['/scan/new','🩺 スキャン入力'],['/notes','📒 野帳'],['/vaccine','💉 ワクチン接種','vaccine'],['/exam-memo','📝 検診日誌']]},
+  {title:'個体・場所',items:[['/animals','🐮 個体管理'],['/history','🕘 履歴'],['/hatch-map','🏠 ハッチ'],['/pen-map','🐄 群']]},
+  {title:'集計・出力',items:[['/dashboard','📊 ダッシュボード'],['/report','📋 レポート'],['/analysis','📈 分析'],['/karte','🧾 カルテ転記']]},
+  {title:'その他',items:[['/guide','📚 ガイド・パンフ'],['/settings','⚙️ 設定']]},
 ];
 const renderSideNav=()=>{
   const el=$('sidenav');if(!el)return;
@@ -2709,7 +2712,7 @@ const renderHistory=()=>{
     <div class="page-title">記録履歴</div>
     <div class="page-sub">${h(farm.name)}　全 ${DB.getScans(fid).length} 件</div>
   </div>
-  <div class="filter-bar">
+  <div class="filter-bar fb-sticky">
     <input class="form-input" placeholder="${farm?.idMode==='custom'?'管理IDまたは耳標番号で検索':'拡大4桁または耳標番号で検索'}" value="${h(f.tag||'')}" onchange="App.setF('tag',this.value)" onkeydown="if(event.key==='Enter'){App.setF('tag',this.value)}" style="width:200px">
     <select class="form-select" onchange="App.setF('sm',this.value?Number(this.value):null)">
       <option value="">スコア：全て</option>
@@ -4026,7 +4029,7 @@ const renderAnimals=()=>{
     <button class="btn-outline" onclick="App.openCsvImport()">📥 CSV インポート</button>
     <button class="btn-primary" onclick="App.openAnimalRegModal()">＋ 個体を登録</button>
   </div>
-  <div class="filter-bar">
+  <div class="filter-bar fb-sticky">
     <input id="animals-search" class="form-input" placeholder="${isCustomId?'管理ID・個体識別番号で検索':'個体識別番号 または 拡大4桁で検索'}" value="${h(AS.q)}" oninput="App.setAq(this.value,this.selectionStart)" style="width:260px">
     <button class="btn-sm btn-ghost" onclick="App.clrAq()">リセット</button>
     <span style="margin-left:auto;font-size:12px;color:var(--text-3)">${animals.length} 頭表示</span>
