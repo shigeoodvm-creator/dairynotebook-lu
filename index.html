@@ -3965,7 +3965,7 @@ const renderHowto=()=>{
         <tr><th>ダッシュボード</th><td>登録頭数、有病率（スコア2以上）、治療介入率、最近の記録などを一覧します。</td></tr>
         <tr><th>スキャン入力</th><td>1頭ずつ所見を入力します。</td></tr>
         <tr><th>📋 レポート</th><td>農場向けの検診結果レポートを作り、印刷します。</td></tr>
-        <tr><th>📄 通知書</th><td>日付を選んで、農場向けの「治療通知書」「ワクチン接種通知書」（A4・印刷/PDF）を作ります。治療通知書は、治療薬を使った牛だけか、検診した全頭かを選べます。</td></tr>
+        <tr><th>📄 通知書</th><td>日付を選んで、農場向けの「治療通知書」「ワクチン接種通知書」（A4・印刷/PDF）を作ります。治療通知書は、治療薬を使った牛だけか、検診した全頭かを選べます。出荷制限の期限（投与日・接種日＋設定の日数）が牛ごとに載ります。</td></tr>
         <tr><th>個体管理</th><td>登録した牛の一覧と、1頭ごとの検診の経過を見られます。</td></tr>
         <tr><th>履歴</th><td>過去の記録の確認・修正・削除をします。</td></tr>
         <tr><th>野帳</th><td>現場で手書きするための記入用紙を印刷します。</td></tr>
@@ -3975,7 +3975,7 @@ const renderHowto=()=>{
         <tr><th>📝 検診日誌</th><td>検診日ごとの聞き取りや気づきを残すメモです（レポートには出ません）。</td></tr>
         <tr><th>ガイド・パンフ</th><td>獣医師向けのスコア判定基準と、農場向けパンフレットです。</td></tr>
         <tr><th>🧾 カルテ転記</th><td>検査日ごとの記録を、Access 側のカルテへ転記しやすい形で表示・書き出しします。</td></tr>
-        <tr><th>⚙️ 設定</th><td>薬品マスタ、農場ごとのワクチン（接種回数・投与間隔・接種開始日令）など、アプリの設定をします。</td></tr>
+        <tr><th>⚙️ 設定</th><td>薬品マスタ（出荷制限日数を含む）、農場ごとのワクチン（接種回数・投与間隔・接種開始日令）など、アプリの設定をします。</td></tr>
       </table>
     </section>
 
@@ -5811,10 +5811,11 @@ function onCommentSizeChange(){
 }
 
 // ─── KARTE MASTER（薬品・種別コード） ───────────────
-let KMS=null; // {drugs:[{id,name,code}], procs:[{id,name,code}]}（編集中の作業用コピー）
+let KMS=null; // {drugs:[{id,name,code,withdrawDays}], procs:[{id,name,code}]}（編集中の作業用コピー）
 const _kmRowHtml=(kind,r)=>`<tr id="km-${kind}-${r.id}">
     <td><input class="form-input" value="${h(r.name)}" placeholder="名称" onchange="App.kmChange('${kind}','${r.id}','name',this.value)"></td>
     <td><input class="form-input" value="${h(r.code)}" placeholder="コード" style="max-width:140px" onchange="App.kmChange('${kind}','${r.id}','code',this.value)"></td>
+    ${kind==='drugs'?`<td style="white-space:nowrap"><input class="form-input" type="number" min="0" step="1" value="${h(String(r.withdrawDays??''))}" placeholder="未設定" style="max-width:90px" onchange="App.kmChange('${kind}','${r.id}','withdrawDays',this.value)"> 日</td>`:''}
     <td style="white-space:nowrap"><button class="btn-sm btn-danger" onclick="App.kmDel('${kind}','${r.id}')">削除</button></td>
   </tr>`;
 const _kmTableHtml=(kind,title,icon,rows)=>`
@@ -5826,12 +5827,17 @@ const _kmTableHtml=(kind,title,icon,rows)=>`
     </div>
     <div class="tbl-wrap">
       <table id="km-${kind}-tbl">
-        <thead><tr><th>名称</th><th>コード</th><th></th></tr></thead>
+        <thead><tr><th>名称</th><th>コード</th>${kind==='drugs'?'<th>出荷制限（投与日から）</th>':''}<th></th></tr></thead>
         <tbody id="km-${kind}-tbody">${rows.map(r=>_kmRowHtml(kind,r)).join('')}</tbody>
       </table>
     </div>
   </div>`;
 // ─── ワクチン設定（農場ごと） ───────────────────────
+const VACCINE_WITHDRAWAL_DAYS=20; // ワクチンの出荷制限（日）の既定値。出荷制限を設定する前のデータもこの値で扱う
+/** 'YYYY-MM-DD' に n 日足した日付（出荷制限の期限 = 投与日 + 日数） */
+const addDaysYmd=(ymd,n)=>{const [y,m,d]=String(ymd).split('-').map(Number);return new Date(Date.UTC(y,m-1,d+Number(n))).toISOString().slice(0,10);};
+/** 出荷制限の表示（日数未設定=null） */
+const withdrawText=(date,days)=>days==null||days===''?'未設定':Number(days)===0?'なし':`${fmtDate(addDaysYmd(date,days))} まで`;
 /** 農場のワクチン一覧（読み込んだJSON由来でも数値項目を数値に整えて返す） */
 const farmVaccines=(farm,opt={})=>((farm&&farm.vaccines)||[])
   .filter(v=>v&&(!opt.activeOnly||v.active!==false))
@@ -5840,7 +5846,8 @@ const farmVaccines=(farm,opt={})=>((farm&&farm.vaccines)||[])
     return {...v,name:String(v.name??''),doses,
       startAgeDays:Math.max(0,parseInt(v.startAgeDays,10)||0),
       intervals:VaccineLogic.normalizeIntervals(doses,(v.intervals||[]).map(x=>Math.max(0,parseInt(x,10)||0)),0),
-      doseMl:(v.doseMl===''||v.doseMl==null||isNaN(Number(v.doseMl)))?'':Number(v.doseMl)};
+      doseMl:(v.doseMl===''||v.doseMl==null||isNaN(Number(v.doseMl)))?'':Number(v.doseMl),
+      withdrawDays:v.withdrawDays===undefined?VACCINE_WITHDRAWAL_DAYS:(v.withdrawDays===''||v.withdrawDays==null||isNaN(Number(v.withdrawDays)))?'':Math.max(0,parseInt(v.withdrawDays,10)||0)};
   });
 const vaccineOn=farm=>!!(farm&&farm.vaccineEnabled);
 /** inline ハンドラに埋め込む ID（英数字・_・- 以外を除去。読み込んだJSON由来の値でも属性を壊さない） */
@@ -5872,6 +5879,7 @@ const _vmCardHtml=(v)=>{
         ${procs.map(p=>`<option value="${h(p.id)}" ${v.procId===p.id?'selected':''}>${h(p.name)}</option>`).join('')}
       </select></label>
       <label class="vm-f">用量 <input class="form-input" type="number" min="0" step="0.1" value="${h(String(v.doseMl??''))}" style="max-width:80px" onchange="App.vmChange('${jsId(v.id)}','doseMl',this.value)"> mL/頭</label>
+      <label class="vm-f">出荷制限 接種日から <input class="form-input" type="number" min="0" step="1" value="${h(String(v.withdrawDays??''))}" placeholder="未設定" style="max-width:70px" onchange="App.vmChange('${jsId(v.id)}','withdrawDays',this.value)"> 日</label>
     </div>
   </div>`;
 };
@@ -5935,7 +5943,6 @@ const vaccineCandidates=(fid,date,mode,bdFrom,bdTo)=>{
   });
 };
 const VX_LOCKED=new Set(['complete','doneToday','noBirth']);
-const VACCINE_WITHDRAWAL_DAYS=20; // 通知書に記載する出荷制限（日）
 /** 通知書（農場向け・A4縦1枚）の共通の枠。1枚に収まらないときは全体を縮小する。開くと印刷ダイアログを出し、「PDFに保存」でPDF化する */
 const _noticeDoc=(title,body)=>`<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <title>${h(title)}</title>
@@ -5960,6 +5967,7 @@ body{margin:0;font-family:'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;col
 .vn-tbl td.vn-tag{font-family:'Courier New',monospace;font-weight:700;text-align:left}
 .vn-tbl td.vn-tag span{font-family:inherit;font-weight:400;color:#475569}
 .vn-tbl td.vn-l{text-align:left}
+.vn-tbl td.vn-wd{font-weight:800}
 .vn-tbl tr{page-break-inside:avoid}
 .vn-cols .vn-tbl{width:auto}
 .vn-sign{margin-top:6mm;text-align:right;font-size:12pt}
@@ -6001,13 +6009,13 @@ const vaccineNoticeHtml=(farm,vaccine,date,vet,rows,note='')=>{
   <div class="vn-issued">発行日：${h(fmtDate(today()))}</div>
   <div class="vn-to">${h(farm.name)} 様</div>
   <div class="vn-title">ワクチン接種通知書</div>
-  <p class="vn-lead">下記のとおりワクチンを接種しましたので、お知らせいたします。</p>
+  <p class="vn-lead">下記のとおりワクチンを接種しましたので、出荷制限の期限とあわせてお知らせいたします。</p>
   <table class="vn-sum">
     <tr><th>接種日</th><td>${h(fmtDate(date))}</td></tr>
     <tr><th>ワクチン名</th><td>${h(vaccine.name)}</td></tr>
     <tr><th>接種量</th><td>${doseTxt}（計 ${totalTxt}）</td></tr>
     <tr><th>接種頭数</th><td>${rows.length} 頭</td></tr>
-    <tr><th>出荷制限</th><td class="vn-warn">接種日から ${VACCINE_WITHDRAWAL_DAYS} 日間</td></tr>
+    <tr><th>出荷制限</th><td class="vn-warn">${vaccine.withdrawDays===''?'未設定':Number(vaccine.withdrawDays)===0?'なし':`${h(fmtDate(addDaysYmd(date,vaccine.withdrawDays)))} まで（接種日から ${vaccine.withdrawDays} 日間）`}</td></tr>
     ${note?`<tr><th>備考</th><td class="vn-note">${h(note)}</td></tr>`:''}
   </table>
   <div class="vn-cols">${cols.map(tbl).join('')}</div>
@@ -6018,23 +6026,27 @@ const treatNoticeHtml=(farm,date,vet,rows,all,note='')=>{
   const treated=rows.filter(r=>r.drugs.length);
   const cnt={};treated.forEach(r=>[...new Set(r.drugs.map(d=>d.name))].forEach(n=>{cnt[n]=(cnt[n]||0)+1;}));
   const drugSum=Object.entries(cnt).map(([n,c])=>`${h(n)}（${c}頭）`).join('、')||'－';
-  const drugTxt=r=>r.drugs.length?r.drugs.map(d=>h(d.name)+(d.proc?`<span style="color:#475569">／${h(d.proc)}</span>`:'')).join('<br>'):'治療なし';
+  const drugTxt=r=>r.drugs.length?r.drugs.map(d=>h(d.name)+(d.proc?`<span style="color:#475569">／${h(d.proc)}</span>`:'')+`<span style="color:#475569">（${d.wd==null?'制限日数未設定':d.wd+'日'}）</span>`).join('<br>'):'治療なし';
+  const wdTxt=r=>r.drugs.length?h(withdrawText(date,r.wd)):'';
+  const lastUntil=treated.filter(r=>r.wd!=null&&r.wd>0).map(r=>addDaysYmd(date,r.wd)).sort().pop();
+  const unset=treated.some(r=>r.wd==null);
   const qtyTxt=r=>r.drugs.length?r.drugs.map(d=>h(d.qty)||'－').join('<br>'):'';
   const list=rows.map((r,i)=>({...r,no:i+1}));
   const per=list.length>30?Math.ceil(list.length/2):list.length;
   const cols=per?[list.slice(0,per),list.slice(per)].filter(c=>c.length):[];
-  const tbl=c=>`<table class="vn-tbl"><thead><tr><th>No</th><th>個体識別番号</th><th>スコア</th><th>治療区分</th><th>使用薬品／種別</th><th>使用量</th></tr></thead>
-    <tbody>${c.map(r=>`<tr><td>${r.no}</td><td class="vn-tag">${_noticeTag(r.a.tagId||'',r.disp)}</td><td>${r.score??'－'}</td><td>${h(r.status)}</td><td class="vn-l">${drugTxt(r)}</td><td>${qtyTxt(r)}</td></tr>`).join('')}</tbody></table>`;
+  const tbl=c=>`<table class="vn-tbl"><thead><tr><th>No</th><th>個体識別番号</th><th>スコア</th><th>治療区分</th><th>使用薬品／種別（出荷制限）</th><th>使用量</th><th>出荷制限</th></tr></thead>
+    <tbody>${c.map(r=>`<tr><td>${r.no}</td><td class="vn-tag">${_noticeTag(r.a.tagId||'',r.disp)}</td><td>${r.score??'－'}</td><td>${h(r.status)}</td><td class="vn-l">${drugTxt(r)}</td><td>${qtyTxt(r)}</td><td class="vn-wd">${wdTxt(r)}</td></tr>`).join('')}</tbody></table>`;
   return _noticeDoc(`治療通知書_${farm.name}_${date}`,`
   <div class="vn-issued">発行日：${h(fmtDate(today()))}</div>
   <div class="vn-to">${h(farm.name)} 様</div>
   <div class="vn-title">治療通知書</div>
-  <p class="vn-lead">下記のとおり${all?'肺エコー検診および治療':'治療'}を実施しましたので、お知らせいたします。</p>
+  <p class="vn-lead">下記のとおり${all?'肺エコー検診および治療':'治療'}を実施しましたので、出荷制限の期限とあわせてお知らせいたします。</p>
   <table class="vn-sum">
     <tr><th>実施日</th><td>${h(fmtDate(date))}</td></tr>
     ${all?`<tr><th>検診頭数</th><td>${rows.length} 頭</td></tr>`:''}
     <tr><th>治療頭数</th><td>${treated.length} 頭</td></tr>
     <tr><th>使用薬品</th><td>${drugSum}</td></tr>
+    <tr><th>出荷制限</th><td class="vn-warn">${treated.length?(lastUntil?`最長 ${h(fmtDate(lastUntil))} まで`:'なし')+'<span style="font-weight:400;font-size:10pt">（個体ごとの期限は下表の「出荷制限」欄）</span>'+(unset?'<br><span style="font-size:10pt">※出荷制限日数が未設定の薬品があります</span>':''):'－'}</td></tr>
     ${note?`<tr><th>備考</th><td class="vn-note">${h(note)}</td></tr>`:''}
   </table>
   <div class="vn-cols">${cols.map(tbl).join('')}</div>
@@ -6044,8 +6056,9 @@ const treatNoticeHtml=(farm,date,vet,rows,all,note='')=>{
  * 治療通知書の行：その日の実スキャンを牛ごとにまとめる（同日に複数あれば薬品を合わせ、スコアは最大）。
  * onlyTreated=true なら治療薬（drugItems、旧データは drug の自由記述）を使った牛だけ
  */
+const _drugWd=d=>d&&d.withdrawDays!==''&&d.withdrawDays!=null&&!isNaN(Number(d.withdrawDays))?Number(d.withdrawDays):null;
 const _treatNoticeRows=(fid,date,onlyTreated)=>{
-  const dm=Object.fromEntries(Masters.drugs().map(d=>[d.id,d.name]));
+  const dm=Object.fromEntries(Masters.drugs().map(d=>[d.id,d]));
   const pm=Object.fromEntries(Masters.procs().map(p=>[p.id,p.name]));
   const animals=DB.getAnimals(fid);const dispId=makeDispId(fid,animals);
   const by={};
@@ -6056,11 +6069,12 @@ const _treatNoticeRows=(fid,date,onlyTreated)=>{
     const t=s.treatType||(s.treated?'new':'');
     if(t==='new'||(t==='ongoing'&&!r.tt)) r.tt=t;
     const items=(Array.isArray(s.drugItems)?s.drugItems:[]).filter(it=>it.drugId);
-    if(items.length) items.forEach(it=>r.drugs.push({name:dm[it.drugId]||'（削除済み薬品）',proc:pm[it.procId]||'',qty:String(it.qty||'').trim()}));
-    else if(s.drug) r.drugs.push({name:s.drug,proc:'',qty:''});
+    if(items.length) items.forEach(it=>r.drugs.push({name:dm[it.drugId]?.name||'（削除済み薬品）',proc:pm[it.procId]||'',qty:String(it.qty||'').trim(),wd:_drugWd(dm[it.drugId])}));
+    else if(s.drug) r.drugs.push({name:s.drug,proc:'',qty:'',wd:null});
   });
   return Object.values(by).filter(r=>!onlyTreated||r.drugs.length)
-    .map(r=>({...r,status:r.tt==='new'?'治療（新規）':r.tt==='ongoing'?'治療中':'－'}))
+    .map(r=>({...r,status:r.tt==='new'?'治療（新規）':r.tt==='ongoing'?'治療中':'－',
+      wd:r.drugs.some(d=>d.wd==null)?null:Math.max(0,...r.drugs.map(d=>d.wd))}))
     .sort((x,y)=>x.disp.localeCompare(y.disp,undefined,{numeric:true}));
 };
 const _vaccineRows=(fid,vaccine)=>{
@@ -6222,11 +6236,17 @@ const renderNotice=()=>{
   const idLabel=idModeLabel(fid);
   const seg=(k,label)=>`<button type="button" class="treat-seg-btn ${NTS.kind===k?'active':''}" style="${NTS.kind===k?'background:var(--navy);color:#fff':''}" onclick="App.ntSet('kind','${k}')">${label}</button>`;
   const preview=isV
-    ? `<thead><tr><th>No</th><th>${h(idLabel)}</th><th>個体識別番号</th></tr></thead>
-       <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td style="font-weight:600">${h(r.disp)}</td><td>${fmtTagId(r.a.tagId||'')}</td></tr>`).join('')}</tbody>`
-    : `<thead><tr><th>No</th><th>${h(idLabel)}</th><th>スコア</th><th>治療区分</th><th>使用薬品（使用量）</th></tr></thead>
+    ? `<thead><tr><th>No</th><th>${h(idLabel)}</th><th>個体識別番号</th><th>出荷制限</th></tr></thead>
+       <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td style="font-weight:600">${h(r.disp)}</td><td>${fmtTagId(r.a.tagId||'')}</td><td style="font-weight:700">${vaccine?h(withdrawText(NTS.date,vaccine.withdrawDays)):''}</td></tr>`).join('')}</tbody>`
+    : `<thead><tr><th>No</th><th>${h(idLabel)}</th><th>スコア</th><th>治療区分</th><th>使用薬品（使用量）</th><th>出荷制限</th></tr></thead>
        <tbody>${rows.map((r,i)=>`<tr style="${r.drugs.length?'':'color:var(--text-3)'}"><td>${i+1}</td><td style="font-weight:600">${h(r.disp)}</td><td>${r.score??'－'}</td><td>${h(r.status)}</td>
-         <td>${r.drugs.length?r.drugs.map(d=>h(d.name)+(d.qty?`（${h(d.qty)}）`:'')).join('、'):'治療なし'}</td></tr>`).join('')}</tbody>`;
+         <td>${r.drugs.length?r.drugs.map(d=>h(d.name)+(d.qty?`（${h(d.qty)}）`:'')).join('、'):'治療なし'}</td>
+         <td style="font-weight:700;${r.drugs.length&&r.wd==null?'color:#b45309':''}">${r.drugs.length?h(withdrawText(NTS.date,r.wd)):''}</td></tr>`).join('')}</tbody>`;
+  // 出荷制限日数が未設定の薬品・ワクチンは通知書を作る前に知らせる
+  const unsetNames=isV?(vaccine&&vaccine.withdrawDays===''?[vaccine.name]:[])
+    :[...new Set(rows.flatMap(r=>r.drugs.filter(d=>d.wd==null).map(d=>d.name)))];
+  const unsetNote=unsetNames.length?`<div class="callout cl-amber" style="margin:12px 0 0"><div class="callout-i">⚠️</div><div>出荷制限日数が未設定です：${unsetNames.map(h).join('、')}。
+    <a href="#/settings" onclick="App.nav('/settings');return false">⚙️ 設定</a> の${isV?'「ワクチン」':'「薬品マスタ」'}で日数を入れると、通知書に「出荷制限 〇月〇日まで」が載ります。</div></div>`:'';
   setView(`<div class="page-hd">
     <div class="page-title">📄 通知書</div>
     <div class="page-sub">${h(farm.name)}　日付を選んで、農場向けの通知書（A4・印刷/PDF）を作ります</div>
@@ -6249,8 +6269,9 @@ const renderNotice=()=>{
           <input class="form-input" id="nt-vet" value="${h(NS.examiner||'')}" placeholder="氏名" style="width:150px" oninput="NS.examiner=this.value"></div>
       </div>
       <div class="form-group" style="margin:0"><label class="form-label">備考（任意・通知書に載ります）</label>
-        <textarea class="form-input" rows="2" placeholder="${isV?'例：次回接種予定日 など':'例：出荷制限 〇〇 最終投与後〇日間 など'}" oninput="NTS.note=this.value">${h(NTS.note)}</textarea></div>
+        <textarea class="form-input" rows="2" placeholder="${isV?'例：次回接種予定日 など':'例：次回検診予定日 など'}" oninput="NTS.note=this.value">${h(NTS.note)}</textarea></div>
     </div></div>
+    ${unsetNote}
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 8px">
       <div style="font-size:13px;color:var(--text-2)">${isV?`接種 <strong style="color:var(--navy)">${rows.length}頭</strong>`:`${NTS.scope==='all'?`検診 ${rows.length}頭／`:''}<strong style="color:var(--navy)">治療 ${rows.filter(r=>r.drugs.length).length}頭</strong>`}</div>
       <button class="btn-primary" style="margin-left:auto" onclick="App.ntMake()" ${rows.length?'':'disabled'}>📄 通知書を作成（印刷/PDF）</button>
@@ -6266,7 +6287,7 @@ const renderSettingsView=()=>{
   </div>
   <div class="callout cl-blue" style="max-width:980px;margin:0 auto 14px">
     <div class="callout-i">💡</div>
-    <div>カルテ転記で使う薬品名と Access 側コードを設定します。種別コードには、鼻腔スワブ検査（培養・PCR）と注射種別を登録しておきます。</div>
+    <div>カルテ転記で使う薬品名と Access 側コードを設定します。薬品の「出荷制限」は投与日から数えた日数で、治療通知書の「出荷制限 〇月〇日まで」の計算に使います。種別コードには、鼻腔スワブ検査（培養・PCR）と注射種別を登録しておきます。</div>
   </div>
   ${_vmSectionHtml()}
   ${_kmTableHtml('drugs','薬品マスタ','💊',KMS.drugs)}
@@ -6659,7 +6680,8 @@ const App={
   nav(p){this.closeModal();Router.nav(p);this.closeMenus();this.toggleSideNav(false);},
   toggleSideNav(open){document.body.classList.toggle('sn-open',open===undefined?!document.body.classList.contains('sn-open'):!!open);},
   kmChange(kind,id,field,val){
-    const r=(KMS&&KMS[kind]||[]).find(x=>x.id===id);if(r)r[field]=val;
+    const r=(KMS&&KMS[kind]||[]).find(x=>x.id===id);if(!r)return;
+    r[field]=field==='withdrawDays'?(String(val).trim()===''?'':Math.max(0,parseInt(val,10)||0)):val;
   },
   kmAdd(kind){
     const r={id:genId(),name:'',code:''};
@@ -6767,7 +6789,7 @@ const App={
   // ワクチン設定（農場ごと）
   vmToggle(on){VMS.enabled=on;_vmRerender();},
   vmAdd(){
-    VMS.vaccines.push({id:genId(),name:'',doses:2,intervals:[21],startAgeDays:14,drugCode:'',procId:'p_sc',doseMl:'',active:true});
+    VMS.vaccines.push({id:genId(),name:'',doses:2,intervals:[21],startAgeDays:14,drugCode:'',procId:'p_sc',doseMl:'',withdrawDays:VACCINE_WITHDRAWAL_DAYS,active:true});
     _vmRerender();
   },
   vmDel(id){
@@ -6789,6 +6811,7 @@ const App={
     if(field==='active'){v.active=!!val;_vmRerender();return;}
     if(field==='startAgeDays'){v.startAgeDays=val===''?'':parseInt(val,10);return;}
     if(field==='doseMl'){v.doseMl=val===''?'':Number(val);return;}
+    if(field==='withdrawDays'){v.withdrawDays=String(val).trim()===''?'':Math.max(0,parseInt(val,10)||0);return;}
     v[field]=val;
   },
   vmInterval(id,i,val){
