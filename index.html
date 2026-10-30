@@ -2246,7 +2246,7 @@ const updateTopBar=()=>{const fid=DB.activeId();const farm=fid?DB.getFarm(fid):n
 const SIDENAV_GROUPS=[
   {title:'検診',items:[['/scan/new','🩺 スキャン入力'],['/notes','📒 野帳'],['/vaccine','💉 ワクチン接種','vaccine'],['/exam-memo','📝 検診日誌']]},
   {title:'個体・場所',items:[['/animals','🐮 個体管理'],['/history','🕘 履歴'],['/hatch-map','🏠 ハッチ'],['/pen-map','🐄 群']]},
-  {title:'集計・出力',items:[['/dashboard','📊 ダッシュボード'],['/report','📋 レポート'],['/analysis','📈 分析'],['/karte','🧾 カルテ転記']]},
+  {title:'集計・出力',items:[['/dashboard','📊 ダッシュボード'],['/report','📋 レポート'],['/notice','📄 通知書'],['/analysis','📈 分析'],['/karte','🧾 カルテ転記']]},
   {title:'その他',items:[['/guide','📚 ガイド・パンフ'],['/settings','⚙️ 設定']]},
 ];
 const renderSideNav=()=>{
@@ -3965,12 +3965,13 @@ const renderHowto=()=>{
         <tr><th>ダッシュボード</th><td>登録頭数、有病率（スコア2以上）、治療介入率、最近の記録などを一覧します。</td></tr>
         <tr><th>スキャン入力</th><td>1頭ずつ所見を入力します。</td></tr>
         <tr><th>📋 レポート</th><td>農場向けの検診結果レポートを作り、印刷します。</td></tr>
+        <tr><th>📄 通知書</th><td>日付を選んで、農場向けの「治療通知書」「ワクチン接種通知書」（A4・印刷/PDF）を作ります。治療通知書は、治療薬を使った牛だけか、検診した全頭かを選べます。</td></tr>
         <tr><th>個体管理</th><td>登録した牛の一覧と、1頭ごとの検診の経過を見られます。</td></tr>
         <tr><th>履歴</th><td>過去の記録の確認・修正・削除をします。</td></tr>
         <tr><th>野帳</th><td>現場で手書きするための記入用紙を印刷します。</td></tr>
         <tr><th>🏠 ハッチ／🐄 群</th><td>ハッチや群の配置図の上に、各個体のスコアを色で表示します。</td></tr>
         <tr><th>分析</th><td>期間ごとのスコア分布や有病率の推移をグラフで見ます。</td></tr>
-        <tr><th>💉 ワクチン接種</th><td>（設定でワクチンをオンにした農場のみ）対象牛を抽出し、接種した牛をまとめて記録します。野帳を印刷すると「ワクチン接種表」も別紙で付きます。</td></tr>
+        <tr><th>💉 ワクチン接種</th><td>（設定でワクチンをオンにした農場のみ）対象牛を抽出し、接種した牛をまとめて記録します。日付を間違えたときは、画面下の「接種記録の一括修正」で日付ごとに削除・日付変更ができます。野帳を印刷すると「ワクチン接種表」も別紙で付きます。</td></tr>
         <tr><th>📝 検診日誌</th><td>検診日ごとの聞き取りや気づきを残すメモです（レポートには出ません）。</td></tr>
         <tr><th>ガイド・パンフ</th><td>獣医師向けのスコア判定基準と、農場向けパンフレットです。</td></tr>
         <tr><th>🧾 カルテ転記</th><td>検査日ごとの記録を、Access 側のカルテへ転記しやすい形で表示・書き出しします。</td></tr>
@@ -5935,20 +5936,9 @@ const vaccineCandidates=(fid,date,mode,bdFrom,bdTo)=>{
 };
 const VX_LOCKED=new Set(['complete','doneToday','noBirth']);
 const VACCINE_WITHDRAWAL_DAYS=20; // 通知書に記載する出荷制限（日）
-/** ワクチン接種通知書（農場向け・A4縦1枚）。開くと印刷ダイアログを出し、「PDFに保存」でPDF化する */
-const vaccineNoticeHtml=(farm,vaccine,date,vet,rows)=>{
-  const ml=vaccine.doseMl;
-  const doseTxt=(ml===0||ml)?`${ml} mL／頭`:'－';
-  const totalTxt=(ml===0||ml)?`${Math.round(ml*rows.length*10)/10} mL`:'－';
-  const list=rows.map((r,i)=>({no:i+1,tag:r.a.tagId||'',disp:r.disp}));
-  // 1枚に収めるため、32頭を超えたら2列組みにする
-  const per=list.length>32?Math.ceil(list.length/2):list.length;
-  const cols=per?[list.slice(0,per),list.slice(per)].filter(c=>c.length):[];
-  const tbl=c=>`<table class="vn-tbl"><thead><tr><th>No</th><th>個体識別番号</th><th>ワクチン名</th><th>接種量</th></tr></thead>
-    <tbody>${c.map(r=>`<tr><td>${r.no}</td><td class="vn-tag">${h(r.tag)}${r.disp&&r.disp!==r.tag?`<span>（${h(r.disp)}）</span>`:''}</td><td>${h(vaccine.name)}</td><td>${(ml===0||ml)?h(String(ml))+' mL':'－'}</td></tr>`).join('')}</tbody></table>`;
-  const issued=today();
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
-<title>ワクチン接種通知書_${h(farm.name)}_${h(date)}</title>
+/** 通知書（農場向け・A4縦1枚）の共通の枠。1枚に収まらないときは全体を縮小する。開くと印刷ダイアログを出し、「PDFに保存」でPDF化する */
+const _noticeDoc=(title,body)=>`<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
+<title>${h(title)}</title>
 <style>
 @page{size:A4 portrait;margin:14mm 14mm 12mm}
 *{box-sizing:border-box}
@@ -5962,21 +5952,53 @@ body{margin:0;font-family:'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;col
 .vn-sum th,.vn-sum td{border:1px solid #334155;padding:3px 10px;text-align:left}
 .vn-sum th{width:32mm;background:#f1f5f9;font-weight:700}
 .vn-warn{font-weight:800;font-size:12.5pt}
+.vn-note{white-space:pre-wrap}
 .vn-cols{display:flex;gap:6mm;align-items:flex-start}
-.vn-tbl{flex:1;border-collapse:collapse;font-size:9pt;line-height:1.2}
-.vn-tbl th,.vn-tbl td{border:1px solid #334155;padding:1.5px 6px;text-align:center}
+.vn-tbl{flex:1;width:100%;border-collapse:collapse;font-size:9pt;line-height:1.2}
+.vn-tbl th,.vn-tbl td{border:1px solid #334155;padding:1.5px 6px;text-align:center;white-space:nowrap}
 .vn-tbl th{background:#f1f5f9}
 .vn-tbl td.vn-tag{font-family:'Courier New',monospace;font-weight:700;text-align:left}
 .vn-tbl td.vn-tag span{font-family:inherit;font-weight:400;color:#475569}
+.vn-tbl td.vn-l{text-align:left}
+.vn-tbl tr{page-break-inside:avoid}
+.vn-cols .vn-tbl{width:auto}
 .vn-sign{margin-top:6mm;text-align:right;font-size:12pt}
 .vn-sign b{display:inline-block;min-width:50mm;border-bottom:1px solid #0f172a;text-align:left;padding:0 4px}
 .vn-bar{text-align:center;margin:12px}
 .vn-bar button{font-size:14px;padding:8px 18px;border-radius:8px;border:none;background:#1a3a5c;color:#fff;cursor:pointer}
-@media print{body{background:#fff}.vn-page{margin:0;box-shadow:none;width:auto;min-height:0;padding:0}.vn-bar{display:none}}
+@media print{body{background:#fff}.vn-page{margin:0;box-shadow:none;width:auto;min-height:0;padding:0;overflow:hidden}.vn-bar{display:none}}
 </style></head><body>
 <div class="vn-bar"><button onclick="window.print()">🖨 印刷・PDFで保存</button>　印刷画面の送信先で「PDFに保存」を選ぶとPDFになります</div>
-<div class="vn-page">
-  <div class="vn-issued">発行日：${h(fmtDate(issued))}</div>
+<div class="vn-page"><div class="vn-fit">${body}</div></div>
+<script>
+// A4 1枚（本文 182×271mm）に収まるまで縮小する。zoom は組版ごと縮むので印刷時に2ページ目へ割れない
+function vnFit(){
+  var f=document.querySelector('.vn-fit');
+  var m=document.createElement('div');m.style.cssText='position:absolute;width:182mm;height:271mm';document.body.appendChild(m);
+  var W=m.offsetWidth,H=m.offsetHeight;m.remove();
+  for(var s=1;s>0.3;s-=0.01){
+    f.style.zoom=s;f.style.width=(W/s)+'px';
+    if(f.scrollWidth<=W/s+1&&f.getBoundingClientRect().height<=H)break;
+  }
+  if(s>=1){f.style.zoom='';f.style.width='';}
+}
+window.addEventListener('load',function(){vnFit();setTimeout(function(){window.print();},300);});
+<\/script>
+</body></html>`;
+const _noticeTag=(tag,disp)=>`${h(tag)}${disp&&disp!==tag?`<span>（${h(disp)}）</span>`:''}`;
+/** ワクチン接種通知書。rows=[{a,disp}] */
+const vaccineNoticeHtml=(farm,vaccine,date,vet,rows,note='')=>{
+  const ml=vaccine.doseMl;
+  const doseTxt=(ml===0||ml)?`${ml} mL／頭`:'－';
+  const totalTxt=(ml===0||ml)?`${Math.round(ml*rows.length*10)/10} mL`:'－';
+  const list=rows.map((r,i)=>({no:i+1,tag:r.a.tagId||'',disp:r.disp}));
+  // 1枚に収めるため、32頭を超えたら2列組みにする
+  const per=list.length>32?Math.ceil(list.length/2):list.length;
+  const cols=per?[list.slice(0,per),list.slice(per)].filter(c=>c.length):[];
+  const tbl=c=>`<table class="vn-tbl"><thead><tr><th>No</th><th>個体識別番号</th><th>ワクチン名</th><th>接種量</th></tr></thead>
+    <tbody>${c.map(r=>`<tr><td>${r.no}</td><td class="vn-tag">${_noticeTag(r.tag,r.disp)}</td><td>${h(vaccine.name)}</td><td>${(ml===0||ml)?h(String(ml))+' mL':'－'}</td></tr>`).join('')}</tbody></table>`;
+  return _noticeDoc(`ワクチン接種通知書_${farm.name}_${date}`,`
+  <div class="vn-issued">発行日：${h(fmtDate(today()))}</div>
   <div class="vn-to">${h(farm.name)} 様</div>
   <div class="vn-title">ワクチン接種通知書</div>
   <p class="vn-lead">下記のとおりワクチンを接種しましたので、お知らせいたします。</p>
@@ -5986,12 +6008,60 @@ body{margin:0;font-family:'Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif;col
     <tr><th>接種量</th><td>${doseTxt}（計 ${totalTxt}）</td></tr>
     <tr><th>接種頭数</th><td>${rows.length} 頭</td></tr>
     <tr><th>出荷制限</th><td class="vn-warn">接種日から ${VACCINE_WITHDRAWAL_DAYS} 日間</td></tr>
+    ${note?`<tr><th>備考</th><td class="vn-note">${h(note)}</td></tr>`:''}
   </table>
   <div class="vn-cols">${cols.map(tbl).join('')}</div>
-  <div class="vn-sign">獣医師　<b>${h(vet)}</b></div>
-</div>
-<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},300);});<\/script>
-</body></html>`;
+  <div class="vn-sign">獣医師　<b>${h(vet)}</b></div>`);
+};
+/** 治療通知書。rows=_treatNoticeRows の戻り値。all=true なら治療なしの牛も載せる */
+const treatNoticeHtml=(farm,date,vet,rows,all,note='')=>{
+  const treated=rows.filter(r=>r.drugs.length);
+  const cnt={};treated.forEach(r=>[...new Set(r.drugs.map(d=>d.name))].forEach(n=>{cnt[n]=(cnt[n]||0)+1;}));
+  const drugSum=Object.entries(cnt).map(([n,c])=>`${h(n)}（${c}頭）`).join('、')||'－';
+  const drugTxt=r=>r.drugs.length?r.drugs.map(d=>h(d.name)+(d.proc?`<span style="color:#475569">／${h(d.proc)}</span>`:'')).join('<br>'):'治療なし';
+  const qtyTxt=r=>r.drugs.length?r.drugs.map(d=>h(d.qty)||'－').join('<br>'):'';
+  const list=rows.map((r,i)=>({...r,no:i+1}));
+  const per=list.length>30?Math.ceil(list.length/2):list.length;
+  const cols=per?[list.slice(0,per),list.slice(per)].filter(c=>c.length):[];
+  const tbl=c=>`<table class="vn-tbl"><thead><tr><th>No</th><th>個体識別番号</th><th>スコア</th><th>治療区分</th><th>使用薬品／種別</th><th>使用量</th></tr></thead>
+    <tbody>${c.map(r=>`<tr><td>${r.no}</td><td class="vn-tag">${_noticeTag(r.a.tagId||'',r.disp)}</td><td>${r.score??'－'}</td><td>${h(r.status)}</td><td class="vn-l">${drugTxt(r)}</td><td>${qtyTxt(r)}</td></tr>`).join('')}</tbody></table>`;
+  return _noticeDoc(`治療通知書_${farm.name}_${date}`,`
+  <div class="vn-issued">発行日：${h(fmtDate(today()))}</div>
+  <div class="vn-to">${h(farm.name)} 様</div>
+  <div class="vn-title">治療通知書</div>
+  <p class="vn-lead">下記のとおり${all?'肺エコー検診および治療':'治療'}を実施しましたので、お知らせいたします。</p>
+  <table class="vn-sum">
+    <tr><th>実施日</th><td>${h(fmtDate(date))}</td></tr>
+    ${all?`<tr><th>検診頭数</th><td>${rows.length} 頭</td></tr>`:''}
+    <tr><th>治療頭数</th><td>${treated.length} 頭</td></tr>
+    <tr><th>使用薬品</th><td>${drugSum}</td></tr>
+    ${note?`<tr><th>備考</th><td class="vn-note">${h(note)}</td></tr>`:''}
+  </table>
+  <div class="vn-cols">${cols.map(tbl).join('')}</div>
+  <div class="vn-sign">獣医師　<b>${h(vet)}</b></div>`);
+};
+/**
+ * 治療通知書の行：その日の実スキャンを牛ごとにまとめる（同日に複数あれば薬品を合わせ、スコアは最大）。
+ * onlyTreated=true なら治療薬（drugItems、旧データは drug の自由記述）を使った牛だけ
+ */
+const _treatNoticeRows=(fid,date,onlyTreated)=>{
+  const dm=Object.fromEntries(Masters.drugs().map(d=>[d.id,d.name]));
+  const pm=Object.fromEntries(Masters.procs().map(p=>[p.id,p.name]));
+  const animals=DB.getAnimals(fid);const dispId=makeDispId(fid,animals);
+  const by={};
+  DB.getScans(fid).filter(s=>isRealScan(s)&&s.scanDate===date).forEach(s=>{
+    const a=animals.find(x=>x.id===s.animalId)||{id:s.animalId,tagId:s.tagId||''};
+    const r=by[a.id]=by[a.id]||{a,disp:dispId(a.tagId),score:null,tt:'',drugs:[]};
+    if(s.obScore!=null&&(r.score==null||s.obScore>r.score)) r.score=s.obScore;
+    const t=s.treatType||(s.treated?'new':'');
+    if(t==='new'||(t==='ongoing'&&!r.tt)) r.tt=t;
+    const items=(Array.isArray(s.drugItems)?s.drugItems:[]).filter(it=>it.drugId);
+    if(items.length) items.forEach(it=>r.drugs.push({name:dm[it.drugId]||'（削除済み薬品）',proc:pm[it.procId]||'',qty:String(it.qty||'').trim()}));
+    else if(s.drug) r.drugs.push({name:s.drug,proc:'',qty:''});
+  });
+  return Object.values(by).filter(r=>!onlyTreated||r.drugs.length)
+    .map(r=>({...r,status:r.tt==='new'?'治療（新規）':r.tt==='ongoing'?'治療中':'－'}))
+    .sort((x,y)=>x.disp.localeCompare(y.disp,undefined,{numeric:true}));
 };
 const _vaccineRows=(fid,vaccine)=>{
   const animals=vaccineCandidates(fid,VS.date,VS.mode,VS.bdFrom,VS.bdTo);
@@ -6066,6 +6136,126 @@ const renderVaccine=()=>{
     <div style="display:flex;justify-content:flex-end;margin-top:14px">
       <button class="btn-primary" id="vx-reg" onclick="App.vxRegister()" ${VS.pick.size?'':'disabled'}>💉 ${VS.pick.size}頭に登録</button>
     </div>
+    ${_vxFixHtml(fid,farm)}
+  </div>`);
+};
+/** 削除・日付変更で回数（doseNo）がずれないよう、影響した牛×ワクチンの記録を日付順に振り直す */
+const _vxRenumber=(all,changed)=>{
+  const keys=new Set(changed.map(r=>r.animalId+'|'+r.vaccineId));
+  const grp={};
+  all.filter(r=>keys.has(r.animalId+'|'+r.vaccineId)).forEach(r=>{(grp[r.animalId+'|'+r.vaccineId]=grp[r.animalId+'|'+r.vaccineId]||[]).push(r);});
+  Object.values(grp).forEach(g=>g.sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt||'').localeCompare(String(b.createdAt||''))).forEach((r,i)=>{r.doseNo=i+1;}));
+  return all;
+};
+/** ワクチン画面下部：接種日ごとの一括削除・日付変更 */
+const _vxFixHtml=(fid,farm)=>{
+  const recs=DB.getVaccinations(fid);
+  const dates=[...new Set(recs.map(r=>r.date))].filter(Boolean).sort((a,b)=>b.localeCompare(a));
+  if(!dates.length) return '';
+  if(!dates.includes(VS.fixDate)) VS.fixDate=dates[0];
+  const vmap=Object.fromEntries(farmVaccines(farm).map(v=>[v.id,v]));
+  const day=recs.filter(r=>r.date===VS.fixDate);
+  const vids=[...new Set(day.map(r=>r.vaccineId))];
+  if(VS.fixVid&&!vids.includes(VS.fixVid)) VS.fixVid='';
+  const n=day.filter(r=>!VS.fixVid||r.vaccineId===VS.fixVid).length;
+  const cntBy=d=>recs.filter(r=>r.date===d).length;
+  return `<details class="card" style="margin-top:28px" ${VS.fixOpen?'open':''} ontoggle="VS.fixOpen=this.open">
+    <summary style="padding:12px 16px;cursor:pointer;font-weight:700;color:var(--text-2)">🛠 接種記録の一括修正（日付を間違えたとき）</summary>
+    <div style="padding:4px 16px 16px">
+      <div class="form-hint" style="margin-bottom:10px">接種日を選び、その日の接種記録をまとめて削除するか、正しい日付に変更します。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end">
+        <div class="form-group" style="margin:0"><label class="form-label">対象の接種日</label>
+          <select class="form-select" onchange="App.vxFixSet('fixDate',this.value)">
+            ${dates.map(d=>`<option value="${h(d)}" ${d===VS.fixDate?'selected':''}>${h(fmtDate(d))}（${cntBy(d)}件）</option>`).join('')}
+          </select></div>
+        <div class="form-group" style="margin:0"><label class="form-label">ワクチン</label>
+          <select class="form-select" onchange="App.vxFixSet('fixVid',this.value)">
+            <option value="">すべて</option>
+            ${vids.map(id=>`<option value="${h(id)}" ${id===VS.fixVid?'selected':''}>${vmap[id]?h(vmap[id].name):'（削除済みワクチン）'}</option>`).join('')}
+          </select></div>
+        <div style="font-size:13px;color:var(--text-2);padding-bottom:8px">対象 <strong style="color:var(--navy)">${n}件</strong></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-top:14px">
+        <div class="form-group" style="margin:0"><label class="form-label">変更後の接種日</label>
+          <input class="form-input" type="date" value="${h(VS.fixTo||'')}" onchange="VS.fixTo=this.value"></div>
+        <button class="btn-outline" onclick="App.vxBulkMove()" ${n?'':'disabled'}>📅 日付を変更</button>
+        <button class="btn-sm btn-danger" style="margin-left:auto;padding:8px 14px" onclick="App.vxBulkDel()" ${n?'':'disabled'}>🗑 ${n}件を一括削除</button>
+      </div>
+    </div>
+  </details>`;
+};
+
+// ─── 通知書（治療・ワクチン） ─────────────────────────
+// NTS: kind='treat'|'vaccine'／date=対象日／scope='treated'（治療薬を使った牛のみ）|'all'／note=備考
+let NTS={kind:'treat',date:'',vaccineId:'',scope:'treated',note:''};
+/** ワクチン通知書の行：その日・そのワクチンの接種記録（牛ごと1行） */
+const _vaccineNoticeRows=(fid,date,vaccineId)=>{
+  const animals=DB.getAnimals(fid);const dispId=makeDispId(fid,animals);
+  const ids=[...new Set(DB.getVaccinations(fid).filter(r=>r.date===date&&r.vaccineId===vaccineId).map(r=>r.animalId))];
+  return ids.map(id=>animals.find(a=>a.id===id)).filter(Boolean).map(a=>({a,disp:dispId(a.tagId)}))
+    .sort((x,y)=>x.disp.localeCompare(y.disp,undefined,{numeric:true}));
+};
+const renderNotice=()=>{
+  const fid=DB.activeId();const farm=fid?DB.getFarm(fid):null;
+  if(!farm){renderHome();return;}
+  const vOn=vaccineOn(farm);
+  if(!vOn) NTS.kind='treat';
+  const isV=NTS.kind==='vaccine';
+  const dates=isV
+    ? [...new Set(DB.getVaccinations(fid).map(r=>r.date))].filter(Boolean).sort((a,b)=>b.localeCompare(a))
+    : [...new Set(DB.getScans(fid).filter(isRealScan).map(s=>s.scanDate))].filter(Boolean).sort((a,b)=>b.localeCompare(a));
+  if(!dates.includes(NTS.date)) NTS.date=dates[0]||'';
+  let rows=[],vaccine=null,vSel='';
+  if(isV&&NTS.date){
+    const vmap=Object.fromEntries(farmVaccines(farm).map(v=>[v.id,v]));
+    const vids=[...new Set(DB.getVaccinations(fid).filter(r=>r.date===NTS.date).map(r=>r.vaccineId))].filter(id=>vmap[id]);
+    if(!vids.includes(NTS.vaccineId)) NTS.vaccineId=vids[0]||'';
+    vaccine=vmap[NTS.vaccineId]||null;
+    rows=vaccine?_vaccineNoticeRows(fid,NTS.date,NTS.vaccineId):[];
+    vSel=`<div class="form-group" style="margin:0"><label class="form-label">ワクチン</label>
+      <select class="form-select" onchange="App.ntSet('vaccineId',this.value)">
+        ${vids.map(id=>`<option value="${h(id)}" ${id===NTS.vaccineId?'selected':''}>${h(vmap[id].name)}</option>`).join('')||'<option value="">－</option>'}
+      </select></div>`;
+  }else if(NTS.date){
+    rows=_treatNoticeRows(fid,NTS.date,NTS.scope==='treated');
+  }
+  const idLabel=idModeLabel(fid);
+  const seg=(k,label)=>`<button type="button" class="treat-seg-btn ${NTS.kind===k?'active':''}" style="${NTS.kind===k?'background:var(--navy);color:#fff':''}" onclick="App.ntSet('kind','${k}')">${label}</button>`;
+  const preview=isV
+    ? `<thead><tr><th>No</th><th>${h(idLabel)}</th><th>個体識別番号</th></tr></thead>
+       <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td style="font-weight:600">${h(r.disp)}</td><td>${fmtTagId(r.a.tagId||'')}</td></tr>`).join('')}</tbody>`
+    : `<thead><tr><th>No</th><th>${h(idLabel)}</th><th>スコア</th><th>治療区分</th><th>使用薬品（使用量）</th></tr></thead>
+       <tbody>${rows.map((r,i)=>`<tr style="${r.drugs.length?'':'color:var(--text-3)'}"><td>${i+1}</td><td style="font-weight:600">${h(r.disp)}</td><td>${r.score??'－'}</td><td>${h(r.status)}</td>
+         <td>${r.drugs.length?r.drugs.map(d=>h(d.name)+(d.qty?`（${h(d.qty)}）`:'')).join('、'):'治療なし'}</td></tr>`).join('')}</tbody>`;
+  setView(`<div class="page-hd">
+    <div class="page-title">📄 通知書</div>
+    <div class="page-sub">${h(farm.name)}　日付を選んで、農場向けの通知書（A4・印刷/PDF）を作ります</div>
+  </div>
+  <div style="max-width:980px;margin:0 auto;padding:0 12px 60px">
+    <div class="card"><div style="padding:14px 16px;display:flex;flex-direction:column;gap:14px">
+      <div><div class="treat-seg">${seg('treat','🩺 治療通知書')}${vOn?seg('vaccine','💉 ワクチン接種通知書'):''}</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end">
+        <div class="form-group" style="margin:0"><label class="form-label">${isV?'接種日':'検診日'}</label>
+          <select class="form-select" onchange="App.ntSet('date',this.value)">
+            ${dates.map(d=>`<option value="${h(d)}" ${d===NTS.date?'selected':''}>${h(fmtDate(d))}</option>`).join('')||'<option value="">記録がありません</option>'}
+          </select></div>
+        ${vSel}
+        ${isV?'':`<div class="form-group" style="margin:0"><label class="form-label">載せる個体</label>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;min-height:38px">
+            <label class="vm-f"><input type="radio" name="nt-scope" ${NTS.scope==='treated'?'checked':''} onchange="App.ntSet('scope','treated')"> 治療薬を使用した個体のみ</label>
+            <label class="vm-f"><input type="radio" name="nt-scope" ${NTS.scope==='all'?'checked':''} onchange="App.ntSet('scope','all')"> すべての個体（検診した全頭）</label>
+          </div></div>`}
+        <div class="form-group" style="margin:0"><label class="form-label">獣医師名</label>
+          <input class="form-input" id="nt-vet" value="${h(NS.examiner||'')}" placeholder="氏名" style="width:150px" oninput="NS.examiner=this.value"></div>
+      </div>
+      <div class="form-group" style="margin:0"><label class="form-label">備考（任意・通知書に載ります）</label>
+        <textarea class="form-input" rows="2" placeholder="${isV?'例：次回接種予定日 など':'例：出荷制限 〇〇 最終投与後〇日間 など'}" oninput="NTS.note=this.value">${h(NTS.note)}</textarea></div>
+    </div></div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 8px">
+      <div style="font-size:13px;color:var(--text-2)">${isV?`接種 <strong style="color:var(--navy)">${rows.length}頭</strong>`:`${NTS.scope==='all'?`検診 ${rows.length}頭／`:''}<strong style="color:var(--navy)">治療 ${rows.filter(r=>r.drugs.length).length}頭</strong>`}</div>
+      <button class="btn-primary" style="margin-left:auto" onclick="App.ntMake()" ${rows.length?'':'disabled'}>📄 通知書を作成（印刷/PDF）</button>
+    </div>
+    <div class="tbl-wrap"><table>${rows.length?preview:`<tbody><tr><td style="text-align:center;color:var(--text-3);padding:20px">${!dates.length?(isV?'接種記録がありません':'検診記録がありません'):(isV?'この日の接種記録がありません':'この日に治療薬を使用した個体はいません')}</td></tr></tbody>`}</table></div>
   </div>`);
 };
 const renderSettingsView=()=>{
@@ -6513,26 +6703,65 @@ const App={
     const rows=_vaccineRows(fid,vaccine).filter(r=>VS.pick.has(r.a.id)&&!VX_LOCKED.has(r.j.status));
     if(!rows.length)return;
     if(!confirm(`${fmtDate(VS.date)}　${vaccine.name} を ${rows.length}頭に登録します。よろしいですか？`))return;
-    // 通知書の獣医師名：野帳の検査者。空欄なら記名を求める（キャンセル時は登録しない）
-    let vet=(NS.examiner||'').trim();
-    if(!vet){
-      const v=prompt('ワクチン接種通知書に記載する獣医師名を入力してください（野帳の「検査者」にも反映されます）','');
-      if(v===null||!v.trim()){toast('獣医師名が未入力のため、登録を中止しました','warn');return;}
-      vet=v.trim();NS.examiner=vet;
-    }
-    // ポップアップブロック回避のため、クリック処理の中で先に通知書ウィンドウを開く
-    const win=window.open('','_blank');
     DB.addVaccinations(fid,rows.map(r=>({animalId:r.a.id,vaccineId:vaccine.id,date:VS.date,doseNo:r.j.doseNo})));
-    VS.pick=null;
-    toast(`${rows.length}頭の接種を記録しました`,'ok');
+    VS.pick=null;VS.fixDate=VS.date;
+    toast(`${rows.length}頭の接種を記録しました（通知書はサイドメニュー「📄 通知書」から作れます）`,'ok',4000);
     renderVaccine();
-    if(win){
-      win.document.open();
-      win.document.write(vaccineNoticeHtml(farm,vaccine,VS.date,vet,rows));
-      win.document.close();
+  },
+  // 接種記録の一括修正（日付の誤り対策）。VS.fixDate の記録（fixVid=''なら全ワクチン）を削除／fixTo へ移す
+  vxFixSet(field,val){VS[field]=val;renderVaccine();},
+  _vxFixRecs(fid){return DB.getVaccinations(fid).filter(r=>r.date===VS.fixDate&&(!VS.fixVid||r.vaccineId===VS.fixVid));},
+  vxBulkDel(){
+    const fid=DB.activeId();
+    const recs=this._vxFixRecs(fid);if(!recs.length)return;
+    const exp=recs.filter(r=>r.karteExportedAt).length;
+    if(!confirm(`${fmtDate(VS.fixDate)} の接種記録 ${recs.length}件を削除します。よろしいですか？${exp?`\n\n※うち${exp}件はカルテ転記の書き出し済みです。カルテ側の記録は別途修正してください。`:''}`))return;
+    const ids=new Set(recs.map(r=>r.id));
+    DB.saveVaccinations(fid,_vxRenumber(DB.getVaccinations(fid).filter(r=>!ids.has(r.id)),recs));
+    VS.pick=null;
+    toast(`${recs.length}件の接種記録を削除しました`,'ok');
+    renderVaccine();
+  },
+  vxBulkMove(){
+    const fid=DB.activeId();
+    const to=VS.fixTo;
+    if(!to||to===VS.fixDate){toast('変更後の接種日を選んでください','warn');return;}
+    const recs=this._vxFixRecs(fid);if(!recs.length)return;
+    const all=DB.getVaccinations(fid);
+    // 変更先の日に同じ牛・同じワクチンの記録が既にあるものは移さない（二重記録の防止）
+    const clash=r=>all.some(x=>x.id!==r.id&&x.date===to&&x.animalId===r.animalId&&x.vaccineId===r.vaccineId);
+    const move=recs.filter(r=>!clash(r));const skip=recs.length-move.length;
+    if(!move.length){toast(`${fmtDate(to)} に同じ接種記録が既にあるため、変更できる記録がありません`,'warn',4000);return;}
+    const exp=move.filter(r=>r.karteExportedAt).length;
+    if(!confirm(`${fmtDate(VS.fixDate)} の接種記録 ${move.length}件を ${fmtDate(to)} に変更します。よろしいですか？${skip?`\n\n※${skip}件は変更先の日に同じ記録があるため、そのまま残します。`:''}${exp?`\n\n※うち${exp}件はカルテ転記の書き出し済みです。変更後の日付で未書き出しに戻します（カルテ側の記録は別途修正してください）。`:''}`))return;
+    const ids=new Set(move.map(r=>r.id));
+    all.forEach(r=>{if(ids.has(r.id)){r.date=to;delete r.karteExportedAt;}});
+    DB.saveVaccinations(fid,_vxRenumber(all,move));
+    VS.pick=null;VS.fixDate=to;VS.fixTo='';
+    toast(`${move.length}件の接種日を ${fmtDate(to)} に変更しました${skip?`（${skip}件は重複のため残しました）`:''}`,'ok',4000);
+    renderVaccine();
+  },
+
+  // 通知書
+  ntSet(field,val){NTS[field]=val;renderNotice();},
+  ntMake(){
+    const fid=DB.activeId();const farm=DB.getFarm(fid);if(!farm||!NTS.date)return;
+    const vet=(NS.examiner||'').trim();
+    if(!vet){toast('獣医師名を入力してください','warn');$('nt-vet')?.focus();return;}
+    let html;
+    if(NTS.kind==='vaccine'){
+      const vaccine=farmVaccines(farm).find(v=>v.id===NTS.vaccineId);
+      const rows=_vaccineNoticeRows(fid,NTS.date,NTS.vaccineId);
+      if(!vaccine||!rows.length)return;
+      html=vaccineNoticeHtml(farm,vaccine,NTS.date,vet,rows,NTS.note.trim());
     }else{
-      toast('ポップアップがブロックされたため通知書を開けませんでした。ブラウザの設定でこのページのポップアップを許可してください','err',6000);
+      const rows=_treatNoticeRows(fid,NTS.date,NTS.scope==='treated');
+      if(!rows.length)return;
+      html=treatNoticeHtml(farm,NTS.date,vet,rows,NTS.scope==='all',NTS.note.trim());
     }
+    const win=window.open('','_blank');
+    if(!win){toast('ポップアップがブロックされたため通知書を開けませんでした。ブラウザの設定でこのページのポップアップを許可してください','err',6000);return;}
+    win.document.open();win.document.write(html);win.document.close();
   },
 
   // ワクチン設定（農場ごと）
@@ -8366,6 +8595,7 @@ const App={
     Router.on('/karte-master',()=>renderKarteMaster());
     Router.on('/karte',()=>renderKarte());
     Router.on('/vaccine',()=>renderVaccine());
+    Router.on('/notice',()=>renderNotice());
     (async ()=>{
       DB.clearStartupCache();
       if(FileStore._supported()) await _idbSet('fileHandle', null);
